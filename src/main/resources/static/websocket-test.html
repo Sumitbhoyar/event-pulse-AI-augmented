@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventPulse WebSocket Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .message {
+            background-color: #e9ecef;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .message.new-event {
+            border-left-color: #28a745;
+        }
+        .message.event-deleted {
+            border-left-color: #dc3545;
+        }
+        .message.connection {
+            border-left-color: #17a2b8;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metric-label {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        #messages {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #fafafa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 EventPulse WebSocket Test</h1>
+        
+        <div id="status" class="status disconnected">
+            Disconnected from WebSocket
+        </div>
+        
+        <div>
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            <button id="clearBtn" onclick="clearMessages()">Clear Messages</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Live Metrics</h2>
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="metric-value" id="totalEvents">0</div>
+                <div class="metric-label">Total Events</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="recentEvents">0</div>
+                <div class="metric-label">Recent Events (24h)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📝 Create New Event</h2>
+        <form id="eventForm">
+            <div class="form-group">
+                <label for="source">Source:</label>
+                <input type="text" id="source" name="source" value="websocket-test" required>
+            </div>
+            <div class="form-group">
+                <label for="type">Type:</label>
+                <input type="text" id="type" name="type" value="test" required>
+            </div>
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <textarea id="message" name="message" rows="3" required>Test message from WebSocket client</textarea>
+            </div>
+            <button type="submit">Create Event</button>
+        </form>
+    </div>
+
+    <div class="container">
+        <h2>📡 Real-time Messages</h2>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let eventCount = 0;
+        let recentEventCount = 0;
+
+        function connect() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('Connected: ' + frame);
+                setConnected(true);
+                
+                // Subscribe to event updates
+                stompClient.subscribe('/topic/events', function(message) {
+                    const eventMessage = JSON.parse(message.body);
+                    showMessage(eventMessage);
+                    
+                    if (eventMessage.messageType === 'NEW_EVENT') {
+                        eventCount++;
+                        recentEventCount++;
+                        updateMetrics();
+                    } else if (eventMessage.messageType === 'EVENT_DELETED') {
+                        eventCount = Math.max(0, eventCount - 1);
+                        updateMetrics();
+                    }
+                });
+            });
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+            }
+            setConnected(false);
+            console.log("Disconnected");
+        }
+
+        function setConnected(connected) {
+            const statusDiv = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = 'Connected to WebSocket';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = 'Disconnected from WebSocket';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        function showMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            
+            let className = 'message';
+            if (message.messageType === 'NEW_EVENT') {
+                className += ' new-event';
+            } else if (message.messageType === 'EVENT_DELETED') {
+                className += ' event-deleted';
+            } else if (message.messageType === 'CONNECTION_ESTABLISHED') {
+                className += ' connection';
+            }
+            
+            messageDiv.className = className;
+            messageDiv.innerHTML = `
+                <strong>${message.messageType}</strong> - ${message.description}
+                <br><small>${new Date(message.timestamp).toLocaleString()}</small>
+                ${message.event ? `<br><pre>${JSON.stringify(message.event, null, 2)}</pre>` : ''}
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        function updateMetrics() {
+            document.getElementById('totalEvents').textContent = eventCount;
+            document.getElementById('recentEvents').textContent = recentEventCount;
+        }
+
+        // Handle form submission
+        document.getElementById('eventForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const eventData = {
+                source: formData.get('source'),
+                type: formData.get('type'),
+                message: formData.get('message')
+            };
+            
+            fetch('/api/events', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(eventData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Event created:', data);
+                // The WebSocket will receive the broadcast automatically
+            })
+            .catch(error => {
+                console.error('Error creating event:', error);
+            });
+        });
+
+        // Auto-connect on page load
+        window.onload = function() {
+            // Uncomment the line below to auto-connect
+            // connect();
+        };
+    </script>
+</body>
+</html>

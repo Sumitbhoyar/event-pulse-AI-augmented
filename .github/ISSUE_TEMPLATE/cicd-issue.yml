@@ -1,0 +1,116 @@
+name: CI/CD Issue
+description: Report issues with the CI/CD pipeline
+title: "[CI/CD] "
+labels: ["ci-cd", "bug"]
+assignees: []
+
+body:
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Workflow
+      description: Which workflow is affected?
+      options:
+        - build.yml (Main CI/CD)
+        - pr.yml (Pull Request)
+        - release.yml (Release)
+        - Multiple workflows
+    validations:
+      required: true
+
+  - type: dropdown
+    id: job
+    attributes:
+      label: Job
+      description: Which job failed?
+      options:
+        - build-and-test
+        - security-scan
+        - code-quality
+        - build-docker
+        - deploy-staging
+        - deploy-production
+        - release
+        - notify
+        - Multiple jobs
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-message
+    attributes:
+      label: Error Message
+      description: Paste the error message from the workflow logs
+      placeholder: "Error: ..."
+    validations:
+      required: true
+
+  - type: input
+    id: branch
+    attributes:
+      label: Branch
+      description: Which branch triggered the workflow?
+      placeholder: "main, develop, feature/xyz"
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA
+      description: The commit that triggered the workflow
+      placeholder: "abc1234..."
+    validations:
+      required: true
+
+  - type: input
+    id: workflow-run
+    attributes:
+      label: Workflow Run URL
+      description: Link to the failed workflow run
+      placeholder: "https://github.com/owner/repo/actions/runs/123456"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Push to branch 'xyz'
+        2. Workflow fails at step 'abc'
+        3. See error message
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: "The workflow should complete successfully and deploy the application."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any additional information that might be helpful
+      placeholder: "This started happening after updating dependency X to version Y..."
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checks
+      description: Please confirm the following
+      options:
+        - label: I have checked the workflow logs
+          required: true
+        - label: I have searched existing issues
+          required: true
+        - label: I have provided the workflow run URL
+          required: true
+        - label: I have included the error message
+          required: true
