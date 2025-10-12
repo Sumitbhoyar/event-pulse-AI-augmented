@@ -95,7 +95,7 @@ jobs:
       run: mvn org.owasp:dependency-check-maven:check
 
     - name: Upload security report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-report
         path: target/dependency-check-report.html
@@ -253,7 +253,7 @@ jobs:
         EOF
 
     - name: Upload release notes
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: release-notes
         path: release-notes.md
