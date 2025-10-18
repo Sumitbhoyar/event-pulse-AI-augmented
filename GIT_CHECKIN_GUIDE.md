@@ -43,7 +43,7 @@
 **Main Application**:
 ```
 src/main/java/com/eventpulse/
-├── EventpulseApplication.java ✓
+├── EventPulseApplication.java ✓
 ├── config/
 │   ├── OpenApiConfig.java ✓
 │   ├── SecurityConfig.java ✓

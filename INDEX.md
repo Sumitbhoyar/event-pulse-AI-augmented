@@ -199,7 +199,7 @@
 ### Spring Boot
 - Controllers: `src/main/java/com/eventpulse/controller/`
 - Configuration: `src/main/java/com/eventpulse/config/`
-- Main class: [EventpulseApplication.java](src/main/java/com/eventpulse/EventpulseApplication.java)
+- Main class: [EventPulseApplication.java](src/main/java/com/eventpulse/EventPulseApplication.java)
 
 ### Spring Security & JWT
 - Security Config: [SecurityConfig.java](src/main/java/com/eventpulse/config/SecurityConfig.java)
