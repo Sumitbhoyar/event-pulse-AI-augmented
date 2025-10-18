@@ -78,7 +78,7 @@ class EventControllerIntegrationTest {
     }
 
     @Test
-    void createEvent_WithoutToken_ShouldReturn401() throws Exception {
+    void createEvent_WithoutToken_ShouldReturn403() throws Exception {
         // Arrange
         EventRequest request = new EventRequest();
         request.setSource("test");
@@ -86,11 +86,11 @@ class EventControllerIntegrationTest {
         request.setMessage("Test");
         request.setTimestamp(Instant.now());
 
-        // Act & Assert
+        // Act & Assert - Expects 403 because CSRF protection is enabled
         mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isForbidden());
 
         assertThat(eventRepository.count()).isEqualTo(0);
     }
