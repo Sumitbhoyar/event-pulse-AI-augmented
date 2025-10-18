@@ -1,35 +1,188 @@
-openapi: 3.0.3
+openapi: 3.0.1
 info:
   title: EventPulse API
-  description: |
-    A comprehensive event management and analytics platform built with Spring Boot. 
-    EventPulse provides real-time event ingestion, processing, and analytics capabilities 
-    with JWT authentication, WebSocket support, and detailed metrics.
-  version: 1.0.0
+  description: Event management system with real-time WebSocket support, JWT authentication, and metrics aggregation
   contact:
     name: EventPulse Team
+    url: https://github.com/eventpulse
     email: support@eventpulse.com
-    url: https://eventpulse.com
   license:
-    name: MIT License
-    url: https://opensource.org/licenses/MIT
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 1.0.0
 servers:
   - url: http://localhost:8080
-    description: Development Server
+    description: Local Development
   - url: https://api.eventpulse.com
-    description: Production Server
+    description: Production
 
-security:
-  - bearerAuth: []
+tags:
+  - name: Authentication
+    description: Authentication endpoints for JWT token management
+  - name: Events
+    description: Event management endpoints for creating and retrieving events
+  - name: Metrics
+    description: Event metrics and aggregation endpoints
+  - name: Health
+    description: Application health check endpoint (public)
 
 paths:
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and receive JWT token. For demo purposes, accepts any username/password combination.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: admin
+              password: admin123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/events:
+    post:
+      tags:
+        - Events
+      summary: Create a new event
+      description: Creates a new event and broadcasts it to WebSocket subscribers at /topic/events
+      operationId: createEvent
+      security:
+        - bearer-jwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRequest'
+            example:
+              source: user-service
+              type: LOGIN
+              message: User successfully logged in
+              timestamp: '2025-10-18T12:00:00Z'
+      responses:
+        '201':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - JWT token missing or invalid
+
+    get:
+      tags:
+        - Events
+      summary: Retrieve events
+      description: Retrieves events with optional filtering by type, source, and time range
+      operationId: getEvents
+      security:
+        - bearer-jwt: []
+      parameters:
+        - name: type
+          in: query
+          description: Filter by event type
+          required: false
+          schema:
+            type: string
+          example: LOGIN
+        - name: source
+          in: query
+          description: Filter by event source
+          required: false
+          schema:
+            type: string
+          example: user-service
+        - name: from
+          in: query
+          description: Filter events from this timestamp (ISO 8601 format)
+          required: false
+          schema:
+            type: string
+            format: date-time
+          example: '2025-01-01T00:00:00Z'
+        - name: to
+          in: query
+          description: Filter events until this timestamp (ISO 8601 format)
+          required: false
+          schema:
+            type: string
+            format: date-time
+          example: '2025-12-31T23:59:59Z'
+      responses:
+        '200':
+          description: Events retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventResponse'
+        '401':
+          description: Unauthorized - JWT token missing or invalid
+
+  /api/metrics:
+    get:
+      tags:
+        - Metrics
+      summary: Get event metrics
+      description: Retrieves aggregated metrics including total count, counts by type, and counts by source
+      operationId: getMetrics
+      security:
+        - bearer-jwt: []
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+              example:
+                totalCount: 150
+                countByType:
+                  LOGIN: 50
+                  LOGOUT: 30
+                  ERROR: 20
+                  INFO: 50
+                countBySource:
+                  user-service: 80
+                  payment-service: 40
+                  notification-service: 30
+        '401':
+          description: Unauthorized - JWT token missing or invalid
+
   /api/health:
     get:
       tags:
         - Health
-      summary: Health Check
-      description: Check the health status of the application
-      security: []
+      summary: Health check
+      description: Simple health check endpoint that returns application status. This endpoint is public and does not require authentication.
+      operationId: health
       responses:
         '200':
           description: Application is healthy
@@ -40,444 +193,56 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "OK"
+                    example: OK
 
-  /api/auth/login:
-    post:
-      tags:
-        - Authentication
-      summary: User Authentication
-      description: Authenticate a user with username and password, returns a JWT token for accessing protected endpoints.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LoginRequest'
-            examples:
-              admin:
-                summary: Admin login
-                value:
-                  username: admin
-                  password: password
-              user:
-                summary: Regular user login
-                value:
-                  username: user
-                  password: password
-      responses:
-        '200':
-          description: Authentication successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '401':
-          description: Invalid credentials
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '400':
-          description: Invalid request data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/auth/validate:
+  /actuator/health:
     get:
       tags:
-        - Authentication
-      summary: Validate JWT Token
-      description: Validate an existing JWT token and return token information if valid.
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
-            example: "Bearer eyJhbGciOiJIUzUxMiJ9..."
+        - Actuator
+      summary: Actuator health endpoint
+      description: Detailed health information including database connectivity and disk space
+      operationId: actuatorHealth
       responses:
         '200':
-          description: Token is valid
+          description: Health information
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '401':
-          description: Invalid or expired token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
 
-  /api/events:
+  /actuator/metrics:
     get:
       tags:
-        - Events
-      summary: Get Events
-      description: Retrieve events with optional filtering by type, source, and time range
-      parameters:
-        - name: type
-          in: query
-          description: Filter events by type
-          schema:
-            type: string
-            example: "login"
-        - name: source
-          in: query
-          description: Filter events by source
-          schema:
-            type: string
-            example: "user-service"
-        - name: startTime
-          in: query
-          description: Start time for time range filter (ISO-8601 format)
-          schema:
-            type: string
-            format: date-time
-            example: "2023-12-01T00:00:00Z"
-        - name: endTime
-          in: query
-          description: End time for time range filter (ISO-8601 format)
-          schema:
-            type: string
-            format: date-time
-            example: "2023-12-01T23:59:59Z"
+        - Actuator
+      summary: Actuator metrics endpoint
+      description: Available metrics that can be queried
+      operationId: actuatorMetrics
       responses:
         '200':
-          description: Events retrieved successfully
+          description: List of available metrics
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/EventResponse'
-        '400':
-          description: Invalid filter parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
 
-    post:
-      tags:
-        - Events
-      summary: Create Event
-      description: Create a new event with source, type, and message. The timestamp is automatically set to current time.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EventRequest'
-            examples:
-              login_event:
-                summary: User login event
-                value:
-                  source: "user-service"
-                  type: "login"
-                  message: "User john.doe logged in successfully"
-              error_event:
-                summary: Error event
-                value:
-                  source: "payment-service"
-                  type: "error"
-                  message: "Payment processing failed for order #12345"
-      responses:
-        '201':
-          description: Event created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EventResponse'
-        '400':
-          description: Invalid request data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/events/{id}:
+  /actuator/info:
     get:
       tags:
-        - Events
-      summary: Get Event by ID
-      description: Retrieve a specific event by its unique identifier
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event UUID
-          schema:
-            type: string
-            format: uuid
-            example: "123e4567-e89b-12d3-a456-426614174000"
+        - Actuator
+      summary: Actuator info endpoint
+      description: Application information including version, build details, and runtime environment
+      operationId: actuatorInfo
       responses:
         '200':
-          description: Event retrieved successfully
+          description: Application information
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EventResponse'
-        '404':
-          description: Event not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '400':
-          description: Invalid UUID format
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-    delete:
-      tags:
-        - Events
-      summary: Delete Event
-      description: Delete a specific event by its unique identifier
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event UUID
-          schema:
-            type: string
-            format: uuid
-            example: "123e4567-e89b-12d3-a456-426614174000"
-      responses:
-        '204':
-          description: Event deleted successfully
-        '404':
-          description: Event not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '400':
-          description: Invalid UUID format
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/metrics:
-    get:
-      tags:
-        - Metrics
-      summary: Get All Metrics
-      description: Get comprehensive metrics for all events including total count, events by type, and events by source
-      responses:
-        '200':
-          description: Metrics retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MetricsResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/metrics?startTime={startTime}&endTime={endTime}:
-    get:
-      tags:
-        - Metrics
-      summary: Get Metrics by Time Range
-      description: Get metrics for events within a specific time range
-      parameters:
-        - name: startTime
-          in: query
-          required: true
-          description: Start time for metrics (ISO-8601 format)
-          schema:
-            type: string
-            format: date-time
-            example: "2023-12-01T00:00:00Z"
-        - name: endTime
-          in: query
-          required: true
-          description: End time for metrics (ISO-8601 format)
-          schema:
-            type: string
-            format: date-time
-            example: "2023-12-01T23:59:59Z"
-      responses:
-        '200':
-          description: Metrics retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MetricsResponse'
-        '400':
-          description: Invalid time range
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/metrics/recent:
-    get:
-      tags:
-        - Metrics
-      summary: Get Recent Metrics
-      description: Get metrics for events from the last N hours
-      parameters:
-        - name: hours
-          in: query
-          description: Number of hours to look back
-          schema:
-            type: integer
-            default: 24
-            minimum: 1
-            example: 24
-      responses:
-        '200':
-          description: Recent metrics retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MetricsResponse'
-        '400':
-          description: Invalid hours parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/metrics/total:
-    get:
-      tags:
-        - Metrics
-      summary: Get Total Event Count
-      description: Get the total count of all events
-      responses:
-        '200':
-          description: Total count retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CountResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/metrics/type/{type}:
-    get:
-      tags:
-        - Metrics
-      summary: Get Event Count by Type
-      description: Get the count of events for a specific type
-      parameters:
-        - name: type
-          in: path
-          required: true
-          description: Event type to count
-          schema:
-            type: string
-            example: "login"
-      responses:
-        '200':
-          description: Count retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CountResponse'
-        '400':
-          description: Invalid type parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/metrics/source/{source}:
-    get:
-      tags:
-        - Metrics
-      summary: Get Event Count by Source
-      description: Get the count of events for a specific source
-      parameters:
-        - name: source
-          in: path
-          required: true
-          description: Event source to count
-          schema:
-            type: string
-            example: "user-service"
-      responses:
-        '200':
-          description: Count retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CountResponse'
-        '400':
-          description: Invalid source parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
 
 components:
   securitySchemes:
-    bearerAuth:
+    bearer-jwt:
       type: http
       scheme: bearer
       bearerFormat: JWT
@@ -492,16 +257,13 @@ components:
       properties:
         username:
           type: string
-          minLength: 3
-          maxLength: 50
           description: Username for authentication
-          example: "admin"
+          example: admin
         password:
           type: string
-          minLength: 6
-          maxLength: 100
+          format: password
           description: Password for authentication
-          example: "password"
+          example: admin123
 
     LoginResponse:
       type: object
@@ -509,24 +271,7 @@ components:
         token:
           type: string
           description: JWT authentication token
-          example: "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY3MDAwMDAwMCwiZXhwIjoxNjcwMDg2NDAwfQ.example-signature"
-        type:
-          type: string
-          description: Token type
-          example: "Bearer"
-        username:
-          type: string
-          description: Authenticated username
-          example: "admin"
-        expiresAt:
-          type: string
-          format: date-time
-          description: Token expiration time
-          example: "2023-12-02T10:30:00Z"
-        message:
-          type: string
-          description: Response message
-          example: "Authentication successful"
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY5...
 
     EventRequest:
       type: object
@@ -534,22 +279,25 @@ components:
         - source
         - type
         - message
+        - timestamp
       properties:
         source:
           type: string
-          maxLength: 255
-          description: Source of the event
-          example: "user-service"
+          description: Source system or service that generated the event
+          example: user-service
         type:
           type: string
-          maxLength: 100
-          description: Type of the event
-          example: "login"
+          description: Event type classification
+          example: LOGIN
         message:
           type: string
-          maxLength: 2000
-          description: Event message
-          example: "User john.doe logged in successfully"
+          description: Event message or description
+          example: User successfully logged in
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp in ISO 8601 format
+          example: '2025-10-18T12:00:00Z'
 
     EventResponse:
       type: object
@@ -558,104 +306,62 @@ components:
           type: string
           format: uuid
           description: Unique event identifier
-          example: "123e4567-e89b-12d3-a456-426614174000"
+          example: 123e4567-e89b-12d3-a456-426614174000
         source:
           type: string
-          description: Source of the event
-          example: "user-service"
+          description: Source system or service that generated the event
+          example: user-service
         type:
           type: string
-          description: Type of the event
-          example: "login"
+          description: Event type classification
+          example: LOGIN
         message:
           type: string
-          description: Event message
-          example: "User john.doe logged in successfully"
+          description: Event message or description
+          example: User successfully logged in
         timestamp:
           type: string
           format: date-time
-          description: Event timestamp
-          example: "2023-12-01T10:30:00Z"
+          description: Event timestamp in ISO 8601 format
+          example: '2025-10-18T12:00:00Z'
 
     MetricsResponse:
       type: object
       properties:
-        totalEvents:
+        totalCount:
           type: integer
           format: int64
-          description: Total number of events
-          example: 1250
-        eventsByType:
-          type: array
-          description: Events grouped by type
-          items:
-            $ref: '#/components/schemas/TypeCount'
-        eventsBySource:
-          type: array
-          description: Events grouped by source
-          items:
-            $ref: '#/components/schemas/SourceCount'
-
-    TypeCount:
-      type: object
-      properties:
-        type:
-          type: string
-          description: Event type
-          example: "login"
-        count:
-          type: integer
-          format: int64
-          description: Number of events of this type
-          example: 450
-
-    SourceCount:
-      type: object
-      properties:
-        source:
-          type: string
-          description: Event source
-          example: "user-service"
-        count:
-          type: integer
-          format: int64
-          description: Number of events from this source
-          example: 650
-
-    CountResponse:
-      type: object
-      properties:
-        count:
-          type: integer
-          format: int64
-          description: Total count
-          example: 1250
+          description: Total number of events in the system
+          example: 150
+        countByType:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: Event counts grouped by type
+          example:
+            LOGIN: 50
+            LOGOUT: 30
+            ERROR: 20
+        countBySource:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: Event counts grouped by source
+          example:
+            user-service: 80
+            payment-service: 40
 
     ErrorResponse:
       type: object
       properties:
-        timestamp:
-          type: string
-          format: date-time
-          description: Error timestamp
-          example: "2023-12-01T10:30:00Z"
-        status:
-          type: integer
-          description: HTTP status code
-          example: 400
         error:
           type: string
-          description: Error type
-          example: "Bad Request"
+          description: Error code
+          example: validation_error
         message:
           type: string
           description: Error message
-          example: "Invalid request data"
-        details:
-          type: object
-          description: Additional error details
-          additionalProperties:
-            type: string
-          example:
-            source: "Event source is required"
-            type: "Event type must not exceed 100 characters"
+          example: Source is required
+

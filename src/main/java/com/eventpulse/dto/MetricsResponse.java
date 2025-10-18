@@ -1,38 +1,44 @@
 package com.eventpulse.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.util.List;
 import java.util.Map;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class MetricsResponse {
 
-    private Long totalEvents;
-    private List<TypeCount> eventsByType;
-    private List<SourceCount> eventsBySource;
+    private long totalCount;
+    private Map<String, Long> countByType;
+    private Map<String, Long> countBySource;
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TypeCount {
-        private String type;
-        private Long count;
+    public MetricsResponse() {}
+
+    public MetricsResponse(long totalCount, Map<String, Long> countByType, Map<String, Long> countBySource) {
+        this.totalCount = totalCount;
+        this.countByType = countByType;
+        this.countBySource = countBySource;
     }
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SourceCount {
-        private String source;
-        private Long count;
+    public long getTotalCount() {
+        return totalCount;
+    }
+
+    public void setTotalCount(long totalCount) {
+        this.totalCount = totalCount;
+    }
+
+    public Map<String, Long> getCountByType() {
+        return countByType;
+    }
+
+    public void setCountByType(Map<String, Long> countByType) {
+        this.countByType = countByType;
+    }
+
+    public Map<String, Long> getCountBySource() {
+        return countBySource;
+    }
+
+    public void setCountBySource(Map<String, Long> countBySource) {
+        this.countBySource = countBySource;
     }
 }
+
+

@@ -2,358 +2,196 @@ package com.eventpulse.service;
 
 import com.eventpulse.entity.Event;
 import com.eventpulse.repository.EventRepository;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("EventService Tests")
 class EventServiceTest {
 
     @Mock
     private EventRepository eventRepository;
 
+    @Mock
+    private Validator validator;
+
     @InjectMocks
     private EventService eventService;
 
     private Event testEvent;
-    private UUID testEventId;
 
     @BeforeEach
     void setUp() {
-        testEventId = UUID.randomUUID();
-        testEvent = Event.builder()
-                .id(testEventId)
-                .source("test-service")
-                .type("test")
-                .message("Test message")
-                .timestamp(Instant.now())
-                .build();
+        testEvent = new Event();
+        testEvent.setId(UUID.randomUUID());
+        testEvent.setSource("test-service");
+        testEvent.setType("INFO");
+        testEvent.setMessage("Test message");
+        testEvent.setTimestamp(Instant.now());
     }
 
     @Test
-    @DisplayName("Should save event successfully")
-    void shouldSaveEventSuccessfully() {
-        // Given
-        Event eventToSave = Event.builder()
-                .source("test-service")
-                .type("test")
-                .message("Test message")
-                .build();
-
+    void save_ValidEvent_ShouldSaveSuccessfully() {
+        // Arrange
+        when(validator.validate(any(Event.class))).thenReturn(Collections.emptySet());
         when(eventRepository.save(any(Event.class))).thenReturn(testEvent);
 
-        // When
-        Event savedEvent = eventService.saveEvent(eventToSave);
+        // Act
+        Event saved = eventService.save(testEvent);
 
-        // Then
-        assertNotNull(savedEvent);
-        assertEquals(testEventId, savedEvent.getId());
-        assertEquals("test-service", savedEvent.getSource());
-        assertEquals("test", savedEvent.getType());
-        assertEquals("Test message", savedEvent.getMessage());
-        assertNotNull(savedEvent.getTimestamp());
-
-        verify(eventRepository, times(1)).save(any(Event.class));
+        // Assert
+        assertThat(saved).isNotNull();
+        assertThat(saved.getId()).isEqualTo(testEvent.getId());
+        verify(eventRepository, times(1)).save(testEvent);
+        verify(validator, times(1)).validate(testEvent);
     }
 
     @Test
-    @DisplayName("Should set timestamp when not provided")
-    void shouldSetTimestampWhenNotProvided() {
-        // Given
-        Event eventWithoutTimestamp = Event.builder()
-                .source("test-service")
-                .type("test")
-                .message("Test message")
-                .build();
+    void save_NullEvent_ShouldThrowIllegalArgumentException() {
+        // Act & Assert
+        assertThatThrownBy(() -> eventService.save(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Event must not be null");
 
-        when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> {
-            Event event = invocation.getArgument(0);
-            event.setId(testEventId);
-            return event;
-        });
-
-        // When
-        Event savedEvent = eventService.saveEvent(eventWithoutTimestamp);
-
-        // Then
-        assertNotNull(savedEvent.getTimestamp());
-        verify(eventRepository, times(1)).save(any(Event.class));
+        verify(eventRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Should throw EventServiceException when save fails")
-    void shouldThrowEventServiceExceptionWhenSaveFails() {
-        // Given
-        Event eventToSave = Event.builder()
-                .source("test-service")
-                .type("test")
-                .message("Test message")
-                .build();
+    void save_EventWithNullTimestamp_ShouldSetTimestamp() {
+        // Arrange
+        testEvent.setTimestamp(null);
+        when(validator.validate(any(Event.class))).thenReturn(Collections.emptySet());
+        when(eventRepository.save(any(Event.class))).thenReturn(testEvent);
 
-        when(eventRepository.save(any(Event.class)))
-                .thenThrow(new RuntimeException("Database error"));
+        // Act
+        Event saved = eventService.save(testEvent);
 
-        // When & Then
-        EventService.EventServiceException exception = assertThrows(
-                EventService.EventServiceException.class,
-                () -> eventService.saveEvent(eventToSave)
-        );
-
-        assertTrue(exception.getMessage().contains("Failed to save event"));
-        verify(eventRepository, times(1)).save(any(Event.class));
+        // Assert
+        assertThat(saved.getTimestamp()).isNotNull();
+        verify(eventRepository, times(1)).save(testEvent);
     }
 
     @Test
-    @DisplayName("Should get event by ID successfully")
-    void shouldGetEventByIdSuccessfully() {
-        // Given
-        when(eventRepository.findById(testEventId)).thenReturn(Optional.of(testEvent));
+    void save_InvalidEvent_ShouldThrowConstraintViolationException() {
+        // Arrange
+        Set<ConstraintViolation<Event>> violations = new HashSet<>();
+        ConstraintViolation<Event> violation = mock(ConstraintViolation.class);
+        violations.add(violation);
+        
+        when(validator.validate(any(Event.class))).thenReturn(violations);
 
-        // When
-        Event retrievedEvent = eventService.getEventById(testEventId);
+        // Act & Assert
+        assertThatThrownBy(() -> eventService.save(testEvent))
+                .isInstanceOf(ConstraintViolationException.class);
 
-        // Then
-        assertNotNull(retrievedEvent);
-        assertEquals(testEventId, retrievedEvent.getId());
-        verify(eventRepository, times(1)).findById(testEventId);
+        verify(eventRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Should throw EventNotFoundException when event not found")
-    void shouldThrowEventNotFoundExceptionWhenEventNotFound() {
-        // Given
-        when(eventRepository.findById(testEventId)).thenReturn(Optional.empty());
-
-        // When & Then
-        EventService.EventNotFoundException exception = assertThrows(
-                EventService.EventNotFoundException.class,
-                () -> eventService.getEventById(testEventId)
-        );
-
-        assertTrue(exception.getMessage().contains("Event not found with ID"));
-        verify(eventRepository, times(1)).findById(testEventId);
-    }
-
-    @Test
-    @DisplayName("Should get all events successfully")
-    void shouldGetAllEventsSuccessfully() {
-        // Given
+    void findByFilters_NoFilters_ShouldReturnAllEvents() {
+        // Arrange
         List<Event> events = Arrays.asList(testEvent);
-        when(eventRepository.findAll()).thenReturn(events);
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(events);
 
-        // When
-        List<Event> retrievedEvents = eventService.getAllEvents();
+        // Act
+        List<Event> result = eventService.findByFilters(null, null, null, null);
 
-        // Then
-        assertNotNull(retrievedEvents);
-        assertEquals(1, retrievedEvents.size());
-        assertEquals(testEventId, retrievedEvents.get(0).getId());
-        verify(eventRepository, times(1)).findAll();
+        // Assert
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isEqualTo(testEvent);
+        verify(eventRepository, times(1)).findAll(any(Specification.class));
     }
 
     @Test
-    @DisplayName("Should get events by type successfully")
-    void shouldGetEventsByTypeSuccessfully() {
-        // Given
-        String eventType = "login";
+    void findByFilters_WithTypeFilter_ShouldReturnFilteredEvents() {
+        // Arrange
         List<Event> events = Arrays.asList(testEvent);
-        when(eventRepository.findByTypeIgnoreCase(eventType)).thenReturn(events);
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(events);
 
-        // When
-        List<Event> retrievedEvents = eventService.getEventsByType(eventType);
+        // Act
+        List<Event> result = eventService.findByFilters("INFO", null, null, null);
 
-        // Then
-        assertNotNull(retrievedEvents);
-        assertEquals(1, retrievedEvents.size());
-        verify(eventRepository, times(1)).findByTypeIgnoreCase(eventType);
+        // Assert
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getType()).isEqualTo("INFO");
+        verify(eventRepository, times(1)).findAll(any(Specification.class));
     }
 
     @Test
-    @DisplayName("Should throw IllegalArgumentException for blank type")
-    void shouldThrowIllegalArgumentExceptionForBlankType() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.getEventsByType("")
-        );
-
-        assertTrue(exception.getMessage().contains("Event type cannot be blank"));
-        verify(eventRepository, never()).findByTypeIgnoreCase(any());
-    }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException for null type")
-    void shouldThrowIllegalArgumentExceptionForNullType() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.getEventsByType(null)
-        );
-
-        assertTrue(exception.getMessage().contains("Event type cannot be blank"));
-        verify(eventRepository, never()).findByTypeIgnoreCase(any());
-    }
-
-    @Test
-    @DisplayName("Should get events by source successfully")
-    void shouldGetEventsBySourceSuccessfully() {
-        // Given
-        String eventSource = "user-service";
+    void findByFilters_WithSourceFilter_ShouldReturnFilteredEvents() {
+        // Arrange
         List<Event> events = Arrays.asList(testEvent);
-        when(eventRepository.findBySourceIgnoreCase(eventSource)).thenReturn(events);
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(events);
 
-        // When
-        List<Event> retrievedEvents = eventService.getEventsBySource(eventSource);
+        // Act
+        List<Event> result = eventService.findByFilters(null, "test-service", null, null);
 
-        // Then
-        assertNotNull(retrievedEvents);
-        assertEquals(1, retrievedEvents.size());
-        verify(eventRepository, times(1)).findBySourceIgnoreCase(eventSource);
+        // Assert
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSource()).isEqualTo("test-service");
+        verify(eventRepository, times(1)).findAll(any(Specification.class));
     }
 
     @Test
-    @DisplayName("Should throw IllegalArgumentException for blank source")
-    void shouldThrowIllegalArgumentExceptionForBlankSource() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.getEventsBySource("   ")
-        );
-
-        assertTrue(exception.getMessage().contains("Event source cannot be blank"));
-        verify(eventRepository, never()).findBySourceIgnoreCase(any());
-    }
-
-    @Test
-    @DisplayName("Should get events by timestamp range successfully")
-    void shouldGetEventsByTimestampRangeSuccessfully() {
-        // Given
-        Instant startTime = Instant.now().minusSeconds(3600);
-        Instant endTime = Instant.now();
+    void findByFilters_WithTimeRange_ShouldReturnFilteredEvents() {
+        // Arrange
+        Instant from = Instant.now().minusSeconds(3600);
+        Instant to = Instant.now();
         List<Event> events = Arrays.asList(testEvent);
-        when(eventRepository.findByTimestampBetween(startTime, endTime)).thenReturn(events);
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(events);
 
-        // When
-        List<Event> retrievedEvents = eventService.getEventsByTimestampRange(startTime, endTime);
+        // Act
+        List<Event> result = eventService.findByFilters(null, null, from, to);
 
-        // Then
-        assertNotNull(retrievedEvents);
-        assertEquals(1, retrievedEvents.size());
-        verify(eventRepository, times(1)).findByTimestampBetween(startTime, endTime);
+        // Assert
+        assertThat(result).hasSize(1);
+        verify(eventRepository, times(1)).findAll(any(Specification.class));
     }
 
     @Test
-    @DisplayName("Should throw IllegalArgumentException for invalid time range")
-    void shouldThrowIllegalArgumentExceptionForInvalidTimeRange() {
-        // Given
-        Instant startTime = Instant.now();
-        Instant endTime = Instant.now().minusSeconds(3600);
+    void findByFilters_InvalidTimeRange_ShouldThrowIllegalArgumentException() {
+        // Arrange
+        Instant from = Instant.now();
+        Instant to = Instant.now().minusSeconds(3600);
 
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.getEventsByTimestampRange(startTime, endTime)
-        );
+        // Act & Assert
+        assertThatThrownBy(() -> eventService.findByFilters(null, null, from, to))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("from must be before or equal to to");
 
-        assertTrue(exception.getMessage().contains("Start time cannot be after end time"));
-        verify(eventRepository, never()).findByTimestampBetween(any(), any());
+        verify(eventRepository, never()).findAll(any(Specification.class));
     }
 
     @Test
-    @DisplayName("Should throw IllegalArgumentException for null time range")
-    void shouldThrowIllegalArgumentExceptionForNullTimeRange() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> eventService.getEventsByTimestampRange(null, Instant.now())
-        );
-
-        assertTrue(exception.getMessage().contains("Both start and end times must be provided"));
-        verify(eventRepository, never()).findByTimestampBetween(any(), any());
-    }
-
-    @Test
-    @DisplayName("Should get events with all filters successfully")
-    void shouldGetEventsWithAllFiltersSuccessfully() {
-        // Given
-        String type = "login";
-        String source = "user-service";
-        Instant startTime = Instant.now().minusSeconds(3600);
-        Instant endTime = Instant.now();
+    void findByFilters_AllFilters_ShouldReturnFilteredEvents() {
+        // Arrange
+        Instant from = Instant.now().minusSeconds(3600);
+        Instant to = Instant.now();
         List<Event> events = Arrays.asList(testEvent);
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(events);
 
-        when(eventRepository.findByTypeIgnoreCaseAndSourceIgnoreCaseAndTimestampBetween(
-                type, source, startTime, endTime)).thenReturn(events);
+        // Act
+        List<Event> result = eventService.findByFilters("INFO", "test-service", from, to);
 
-        // When
-        List<Event> retrievedEvents = eventService.getEventsWithFilters(type, source, startTime, endTime);
-
-        // Then
-        assertNotNull(retrievedEvents);
-        assertEquals(1, retrievedEvents.size());
-        verify(eventRepository, times(1)).findByTypeIgnoreCaseAndSourceIgnoreCaseAndTimestampBetween(
-                type, source, startTime, endTime);
-    }
-
-    @Test
-    @DisplayName("Should get events with type and source filters")
-    void shouldGetEventsWithTypeAndSourceFilters() {
-        // Given
-        String type = "login";
-        String source = "user-service";
-        List<Event> events = Arrays.asList(testEvent);
-
-        when(eventRepository.findByTypeIgnoreCaseAndSourceIgnoreCase(type, source)).thenReturn(events);
-
-        // When
-        List<Event> retrievedEvents = eventService.getEventsWithFilters(type, source, null, null);
-
-        // Then
-        assertNotNull(retrievedEvents);
-        assertEquals(1, retrievedEvents.size());
-        verify(eventRepository, times(1)).findByTypeIgnoreCaseAndSourceIgnoreCase(type, source);
-    }
-
-    @Test
-    @DisplayName("Should delete event successfully")
-    void shouldDeleteEventSuccessfully() {
-        // Given
-        when(eventRepository.existsById(testEventId)).thenReturn(true);
-
-        // When
-        eventService.deleteEvent(testEventId);
-
-        // Then
-        verify(eventRepository, times(1)).existsById(testEventId);
-        verify(eventRepository, times(1)).deleteById(testEventId);
-    }
-
-    @Test
-    @DisplayName("Should throw EventNotFoundException when deleting non-existent event")
-    void shouldThrowEventNotFoundExceptionWhenDeletingNonExistentEvent() {
-        // Given
-        when(eventRepository.existsById(testEventId)).thenReturn(false);
-
-        // When & Then
-        EventService.EventNotFoundException exception = assertThrows(
-                EventService.EventNotFoundException.class,
-                () -> eventService.deleteEvent(testEventId)
-        );
-
-        assertTrue(exception.getMessage().contains("Event not found with ID"));
-        verify(eventRepository, times(1)).existsById(testEventId);
-        verify(eventRepository, never()).deleteById(any());
+        // Assert
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getType()).isEqualTo("INFO");
+        assertThat(result.get(0).getSource()).isEqualTo("test-service");
+        verify(eventRepository, times(1)).findAll(any(Specification.class));
     }
 }
+

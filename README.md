@@ -1,919 +1,761 @@
 # EventPulse
 
-[![CI/CD Pipeline](https://github.com/your-org/EventPulse/workflows/EventPulse%20CI/CD%20Pipeline/badge.svg)](https://github.com/your-org/EventPulse/actions)
-[![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue)](https://github.com/your-org/EventPulse/pkgs/container/eventpulse)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/java-21-orange.svg)](https://openjdk.java.net/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/spring--boot-3.2.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+A production-ready Spring Boot application for event management with real-time WebSocket support, JWT authentication, metrics aggregation, and comprehensive API documentation.
 
-> A comprehensive event management and analytics platform built with Spring Boot, featuring real-time event ingestion, processing, and analytics capabilities with JWT authentication, WebSocket support, and detailed metrics.
+[![Build and Push](https://github.com/your-username/EventPulse-AI-Augmented/workflows/Build%20and%20Push/badge.svg)](https://github.com/your-username/EventPulse-AI-Augmented/actions)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/projects/jdk/17/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
 
-## 📋 Table of Contents
+## 🚀 Features
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [API Documentation](#api-documentation)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
-- [Development](#development)
-- [Testing](#testing)
-- [Monitoring](#monitoring)
-- [Contributing](#contributing)
-- [Future Enhancements](#future-enhancements)
-- [License](#license)
+- 🔐 **JWT Authentication** - Secure API endpoints with JSON Web Tokens
+- 📊 **Event Management** - Create, retrieve, and filter events with validation
+- 📈 **Metrics Aggregation** - Real-time event statistics using JPQL queries
+- 🔌 **WebSocket Support** - Real-time event broadcasting via STOMP over WebSocket
+- 💾 **Dual Database Support** - PostgreSQL (production) and H2 (development)
+- ✅ **Input Validation** - Bean validation with custom error responses
+- 🛡️ **Global Exception Handling** - Consistent error response format
+- 📚 **OpenAPI/Swagger** - Interactive API documentation with Swagger UI
+- 📊 **Spring Boot Actuator** - Health checks, metrics, and monitoring endpoints
+- 🐳 **Docker Support** - Multi-stage Dockerfile and Docker Compose orchestration
+- 🧪 **Comprehensive Tests** - JUnit 5 + Mockito unit and integration tests
 
-## 🎯 Overview
+## 📋 Prerequisites
 
-EventPulse is a modern event management platform designed to handle high-volume event ingestion, real-time processing, and comprehensive analytics. Built with Spring Boot and leveraging modern technologies, it provides a robust foundation for event-driven architectures.
+- **Java 17** or higher
+- **Maven 3.6+**
+- **Docker Desktop** (optional, for containerized deployment)
 
-### Key Capabilities
+## 🎯 Quick Start
 
-- **Real-time Event Ingestion** - RESTful API with WebSocket support
-- **Comprehensive Analytics** - Event metrics and aggregations
-- **Security** - JWT-based authentication and authorization
-- **Scalability** - Docker containerization with horizontal scaling support
-- **Monitoring** - Built-in observability with Spring Boot Actuator
-- **Documentation** - Interactive API documentation with Swagger/OpenAPI
+### Option 1: Using Docker (Recommended for Production)
 
-## 🏗️ Architecture
+**Prerequisites**: Docker Desktop running
 
-### System Architecture
+```powershell
+# Build and start all services (PostgreSQL + Backend)
+docker compose up -d --build
 
-```mermaid
-graph TB
-    Client[Client Applications] --> LB[Load Balancer]
-    LB --> API[EventPulse API]
-    
-    API --> Auth[JWT Authentication]
-    API --> Events[Event Processing]
-    API --> Metrics[Analytics Engine]
-    
-    Events --> DB[(PostgreSQL)]
-    Metrics --> DB
-    
-    API --> WS[WebSocket Server]
-    WS --> Clients[Real-time Clients]
-    
-    API --> Actuator[Health & Metrics]
-    Actuator --> Monitor[Monitoring Systems]
-    
-    subgraph "Deployment"
-        API
-        DB
-        Monitor
-    end
-    
-    subgraph "External Systems"
-        Client
-        LB
-        Clients
-    end
+# Check status
+docker compose ps
+
+# View logs
+docker compose logs -f eventpulse-backend
+
+# Test the application
+.\docker-manage.ps1 test
 ```
 
-### Technology Stack
+The application will be available at `http://localhost:8080` with PostgreSQL running in a container.
 
-| Component | Technology | Version |
-|-----------|------------|---------|
-| **Backend** | Spring Boot | 3.2.0 |
-| **Java** | OpenJDK | 21 |
-| **Database** | PostgreSQL | 15 |
-| **Security** | Spring Security + JWT | Latest |
-| **Documentation** | SpringDoc OpenAPI | 2.2.0 |
-| **Monitoring** | Spring Boot Actuator | Built-in |
-| **Container** | Docker | Latest |
-| **CI/CD** | GitHub Actions | Latest |
+📖 **Detailed guide**: [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)
 
-### Component Architecture
+### Option 2: Using H2 In-Memory Database (Fastest for Development)
 
-```mermaid
-graph LR
-    subgraph "Presentation Layer"
-        REST[REST Controllers]
-        WS[WebSocket Controllers]
-        DOC[API Documentation]
-    end
-    
-    subgraph "Business Layer"
-        SVC[Services]
-        AUTH[Authentication]
-        METRICS[Metrics Engine]
-    end
-    
-    subgraph "Data Layer"
-        REPO[Repositories]
-        ENTITY[Entities]
-        DB[(Database)]
-    end
-    
-    subgraph "Infrastructure"
-        CONFIG[Configuration]
-        SECURITY[Security]
-        MONITORING[Monitoring]
-    end
-    
-    REST --> SVC
-    WS --> SVC
-    DOC --> REST
-    SVC --> REPO
-    AUTH --> SECURITY
-    METRICS --> REPO
-    REPO --> ENTITY
-    ENTITY --> DB
-    CONFIG --> SECURITY
-    CONFIG --> MONITORING
+The application is pre-configured to use H2 database by default:
+
+```powershell
+mvn spring-boot:run
 ```
 
-## ✨ Features
+**Access H2 Console**:
+- URL: `http://localhost:8080/h2-console`
+- JDBC URL: `jdbc:h2:mem:eventpulse`
+- Username: `sa`
+- Password: (leave empty)
 
-### Core Features
+### Option 3: Using Docker PostgreSQL Only + Local Backend
 
-- **Event Management**
-  - Create, read, update, and delete events
-  - Bulk event processing
-  - Event filtering and search
-  - Real-time event streaming via WebSocket
+**1. Start PostgreSQL only**:
+```powershell
+docker compose up -d postgres
+```
 
-- **Analytics & Metrics**
-  - Event count aggregations
-  - Time-based analytics
-  - Source and type breakdowns
-  - Custom metric queries
+**2. Update `application.yaml`** to use PostgreSQL (uncomment PostgreSQL config)
 
-- **Security**
-  - JWT-based authentication
-  - Role-based access control
-  - Secure API endpoints
-  - Token validation and refresh
+**3. Run application locally**:
+```powershell
+mvn spring-boot:run
+```
 
-- **Real-time Features**
-  - WebSocket event broadcasting
-  - Live event notifications
-  - Real-time metrics updates
-  - Connection management
+## 📚 Documentation
 
-### Advanced Features
+- **[README.md](README.md)** - This file (Quick start and overview)
+- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API reference with examples
+- **[DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)** - Docker deployment guide
+- **[design/openapi.yaml](design/openapi.yaml)** - OpenAPI 3.0 specification
 
-- **Observability**
-  - Health checks and monitoring
-  - Performance metrics
-  - Request tracing
-  - Error tracking
+## 🌐 Access Points
 
-- **Documentation**
-  - Interactive API documentation
-  - OpenAPI specification
-  - Code examples
-  - Testing interface
+Once the application is running:
 
-- **DevOps**
-  - Docker containerization
-  - CI/CD pipeline
-  - Automated testing
-  - Multi-environment support
+| Resource | URL | Description |
+|----------|-----|-------------|
+| **Swagger UI** | http://localhost:8080/swagger-ui.html | Interactive API documentation |
+| **OpenAPI Spec** | http://localhost:8080/v3/api-docs | OpenAPI JSON specification |
+| **Health Check** | http://localhost:8080/api/health | Simple health status |
+| **Actuator Health** | http://localhost:8080/actuator/health | Detailed health information |
+| **Actuator Metrics** | http://localhost:8080/actuator/metrics | Application metrics |
+| **Actuator Info** | http://localhost:8080/actuator/info | Application information |
+| **H2 Console** | http://localhost:8080/h2-console | H2 database console (dev only) |
+| **WebSocket Client** | http://localhost:8080/ws-client.html | WebSocket test client |
 
-## 🚀 Quick Start
+## 🔑 Authentication
 
-### Prerequisites
+### Quick Authentication Guide
 
-- **Java 21** or higher
-- **Maven 3.6+** or higher
-- **PostgreSQL 15** or higher
-- **Docker** (optional, for containerized deployment)
+**1. Login to get JWT token**:
+```powershell
+$response = Invoke-RestMethod -Method POST `
+  -Uri http://localhost:8080/api/auth/login `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body '{"username":"admin","password":"admin"}'
 
-### Local Development Setup
+$token = $response.token
+Write-Host "Token: $token"
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/EventPulse.git
-   cd EventPulse
-   ```
+**Note**: For demo purposes, the login accepts **any username/password** combination.
 
-2. **Set up PostgreSQL database**
-   ```bash
-   # Using Docker
-   docker run --name eventpulse-postgres \
-     -e POSTGRES_DB=eventpulse \
-     -e POSTGRES_USER=eventpulse \
-     -e POSTGRES_PASSWORD=eventpulse \
-     -p 5432:5432 \
-     -d postgres:15-alpine
-   ```
+**2. Use token for protected endpoints**:
+```powershell
+Invoke-RestMethod -Uri http://localhost:8080/api/events `
+  -Headers @{ "Authorization" = "Bearer $token" }
+```
 
-3. **Configure application**
-   ```bash
-   # Copy and modify configuration
-   cp src/main/resources/application.yaml src/main/resources/application-local.yaml
-   # Update database connection details if needed
-   ```
+### Public Endpoints (No Auth Required)
+- `GET /api/health`
+- `POST /api/auth/login`
+- `GET /actuator/**`
+- `GET /swagger-ui/**`
+- `GET /h2-console/**`
+- `GET /ws`, `/ws/**`
 
-4. **Build and run**
-   ```bash
-   # Build the application
-   mvn clean compile
-   
-   # Run tests
-   mvn test
-   
-   # Start the application
-   mvn spring-boot:run
-   ```
+### Protected Endpoints (JWT Required)
+- `POST /api/events`
+- `GET /api/events`
+- `GET /api/metrics`
 
-5. **Verify installation**
-   ```bash
-   # Health check
-   curl http://localhost:8080/api/health
-   
-   # API documentation
-   open http://localhost:8080/swagger-ui.html
-   ```
+## 📡 API Endpoints
 
-### Docker Setup
+### Health Check (Public)
 
-1. **Using Docker Compose (Recommended)**
-   ```bash
-   # Start all services
-   docker-compose up -d
-   
-   # View logs
-   docker-compose logs -f
-   
-   # Stop services
-   docker-compose down
-   ```
+```powershell
+curl http://localhost:8080/api/health
+```
 
-2. **Using Docker directly**
-   ```bash
-   # Build image
-   docker build -t eventpulse .
-   
-   # Run container
-   docker run -d \
-     --name eventpulse \
-     -p 8080:8080 \
-     -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/eventpulse \
-     -e SPRING_DATASOURCE_USERNAME=eventpulse \
-     -e SPRING_DATASOURCE_PASSWORD=eventpulse \
-     eventpulse
-   ```
-
-## 📚 API Documentation
+**Response**: `{"status":"OK"}`
 
 ### Authentication
 
-EventPulse uses JWT-based authentication. Obtain a token by authenticating with the login endpoint.
-
-#### Login
-```bash
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "password"
-  }'
+```powershell
+# Login
+Invoke-RestMethod -Method POST `
+  -Uri http://localhost:8080/api/auth/login `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body '{"username":"admin","password":"admin"}'
 ```
 
-**Response:**
+**Response**:
 ```json
 {
-  "token": "eyJhbGciOiJIUzUxMiJ9...",
-  "type": "Bearer",
-  "username": "admin",
-  "expiresAt": "2023-12-02T10:30:00Z",
-  "message": "Authentication successful"
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-### Event Management
+### Create Event (Protected)
 
-#### Create Event
-```bash
-curl -X POST http://localhost:8080/api/events \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "user-service",
-    "type": "login",
-    "message": "User john.doe logged in successfully"
-  }'
+```powershell
+Invoke-RestMethod -Method POST `
+  -Uri http://localhost:8080/api/events `
+  -Headers @{ 
+    "Authorization" = "Bearer $token"
+    "Content-Type" = "application/json" 
+  } `
+  -Body '{"source":"user-service","type":"LOGIN","message":"User logged in","timestamp":"2025-10-18T12:00:00Z"}'
 ```
 
-**Response:**
+**Response** (201 Created):
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "source": "user-service",
-  "type": "login",
-  "message": "User john.doe logged in successfully",
-  "timestamp": "2023-12-01T10:30:00Z"
+  "type": "LOGIN",
+  "message": "User logged in",
+  "timestamp": "2025-10-18T12:00:00Z"
 }
 ```
 
-#### Get Events with Filtering
-```bash
+### Get Events (Protected)
+
+```powershell
 # Get all events
-curl -X GET http://localhost:8080/api/events \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+Invoke-RestMethod -Uri http://localhost:8080/api/events `
+  -Headers @{ "Authorization" = "Bearer $token" }
 
 # Filter by type
-curl -X GET "http://localhost:8080/api/events?type=login" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+Invoke-RestMethod -Uri "http://localhost:8080/api/events?type=LOGIN" `
+  -Headers @{ "Authorization" = "Bearer $token" }
 
 # Filter by source
-curl -X GET "http://localhost:8080/api/events?source=user-service" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+Invoke-RestMethod -Uri "http://localhost:8080/api/events?source=user-service" `
+  -Headers @{ "Authorization" = "Bearer $token" }
 
 # Filter by time range
-curl -X GET "http://localhost:8080/api/events?startTime=2023-12-01T00:00:00Z&endTime=2023-12-01T23:59:59Z" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-
-# Combined filters
-curl -X GET "http://localhost:8080/api/events?type=login&source=user-service&startTime=2023-12-01T00:00:00Z&endTime=2023-12-01T23:59:59Z" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+Invoke-RestMethod -Uri "http://localhost:8080/api/events?from=2025-01-01T00:00:00Z&to=2025-12-31T23:59:59Z" `
+  -Headers @{ "Authorization" = "Bearer $token" }
 ```
 
-#### Get Event by ID
-```bash
-curl -X GET http://localhost:8080/api/events/123e4567-e89b-12d3-a456-426614174000 \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+### Get Metrics (Protected)
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:8080/api/metrics `
+  -Headers @{ "Authorization" = "Bearer $token" }
 ```
 
-#### Delete Event
-```bash
-curl -X DELETE http://localhost:8080/api/events/123e4567-e89b-12d3-a456-426614174000 \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-### Metrics and Analytics
-
-#### Get All Metrics
-```bash
-curl -X GET http://localhost:8080/api/metrics \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-**Response:**
+**Response**:
 ```json
 {
-  "totalEvents": 1250,
-  "eventsByType": [
-    {"type": "login", "count": 450},
-    {"type": "error", "count": 320},
-    {"type": "payment", "count": 280},
-    {"type": "logout", "count": 200}
-  ],
-  "eventsBySource": [
-    {"source": "user-service", "count": 650},
-    {"source": "payment-service", "count": 400},
-    {"source": "auth-service", "count": 200}
-  ]
+  "totalCount": 150,
+  "countByType": {
+    "LOGIN": 50,
+    "LOGOUT": 30,
+    "ERROR": 20
+  },
+  "countBySource": {
+    "user-service": 80,
+    "payment-service": 40
+  }
 }
 ```
 
-#### Get Metrics by Time Range
-```bash
-curl -X GET "http://localhost:8080/api/metrics?startTime=2023-12-01T00:00:00Z&endTime=2023-12-01T23:59:59Z" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+## 🔌 WebSocket Real-Time Events
+
+### Live Event Notifications
+
+When you create an event via `POST /api/events`, it's automatically broadcast to all WebSocket subscribers.
+
+**WebSocket Endpoint**: `ws://localhost:8080/ws`
+
+**Event Topic**: `/topic/events`
+
+### Test WebSocket
+
+Open the built-in client:
+```
+http://localhost:8080/ws-client.html
 ```
 
-#### Get Recent Metrics
-```bash
-curl -X GET "http://localhost:8080/api/metrics/recent?hours=24" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+1. Click **"Connect"** to establish WebSocket connection
+2. You'll see subscription confirmation
+3. Click **"Send Event"** to create a test event
+4. Watch the event appear in real-time in the log
+
+## 📊 Monitoring & Observability
+
+### Actuator Endpoints
+
+**Health Check** (Detailed):
+```powershell
+curl http://localhost:8080/actuator/health
 ```
 
-#### Get Specific Metrics
-```bash
-# Total event count
-curl -X GET http://localhost:8080/api/metrics/total \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+**Kubernetes Probes**:
+```powershell
+# Liveness
+curl http://localhost:8080/actuator/health/liveness
 
-# Events by type
-curl -X GET http://localhost:8080/api/metrics/type/login \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-
-# Events by source
-curl -X GET http://localhost:8080/api/metrics/source/user-service \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+# Readiness
+curl http://localhost:8080/actuator/health/readiness
 ```
 
-### Health and Monitoring
+**Application Metrics**:
+```powershell
+# List all metrics
+curl http://localhost:8080/actuator/metrics
 
-#### Health Check
-```bash
-curl -X GET http://localhost:8080/api/health
+# Specific metric
+curl http://localhost:8080/actuator/metrics/jvm.memory.used
+curl http://localhost:8080/actuator/metrics/http.server.requests
 ```
 
-#### Application Info
-```bash
-curl -X GET http://localhost:8080/actuator/info
+**Application Info**:
+```powershell
+curl http://localhost:8080/actuator/info
 ```
 
-#### Metrics
-```bash
-curl -X GET http://localhost:8080/actuator/metrics
+**Prometheus Metrics**:
+```powershell
+curl http://localhost:8080/actuator/prometheus
 ```
 
-### WebSocket Connection
+## 📁 Project Structure
 
-```javascript
-// Connect to WebSocket
-const socket = new SockJS('/ws');
-const stompClient = Stomp.over(socket);
+```
+eventpulse/
+├── src/
+│   ├── main/
+│   │   ├── java/com/eventpulse/
+│   │   │   ├── EventpulseApplication.java          # Main application
+│   │   │   ├── config/
+│   │   │   │   ├── OpenApiConfig.java              # Swagger/OpenAPI config
+│   │   │   │   ├── SecurityConfig.java             # JWT & Spring Security
+│   │   │   │   └── WebSocketConfig.java            # STOMP WebSocket config
+│   │   │   ├── controller/
+│   │   │   │   ├── AuthController.java             # /api/auth/login
+│   │   │   │   ├── EventController.java            # /api/events
+│   │   │   │   ├── HealthController.java           # /api/health
+│   │   │   │   └── MetricsController.java          # /api/metrics
+│   │   │   ├── dto/
+│   │   │   │   ├── EventRequest.java               # Event creation DTO
+│   │   │   │   ├── EventResponse.java              # Event response DTO
+│   │   │   │   ├── LoginRequest.java               # Login credentials
+│   │   │   │   ├── LoginResponse.java              # JWT token response
+│   │   │   │   └── MetricsResponse.java            # Metrics DTO
+│   │   │   ├── entity/
+│   │   │   │   └── Event.java                      # JPA entity
+│   │   │   ├── exception/
+│   │   │   │   ├── GlobalExceptionHandler.java     # @RestControllerAdvice
+│   │   │   │   └── InvalidRequestException.java    # Custom exception
+│   │   │   ├── repository/
+│   │   │   │   └── EventRepository.java            # JPA + JPQL queries
+│   │   │   ├── security/
+│   │   │   │   ├── JwtAuthenticationFilter.java    # JWT validation filter
+│   │   │   │   └── JwtUtils.java                   # JWT generation/validation
+│   │   │   └── service/
+│   │   │       ├── EventService.java               # Event business logic
+│   │   │       └── MetricsService.java             # Metrics aggregation
+│   │   └── resources/
+│   │       ├── application.yaml                    # Main config (H2)
+│   │       ├── application-docker.yaml             # Docker/PostgreSQL config
+│   │       ├── application-h2.yaml                 # H2 development config
+│   │       └── static/
+│   │           └── ws-client.html                  # WebSocket test client
+│   └── test/
+│       └── java/com/eventpulse/
+│           ├── controller/
+│           │   ├── EventControllerTest.java        # Unit tests
+│           │   ├── EventControllerIntegrationTest.java  # Integration tests
+│           │   └── TestSecurityConfig.java         # Test security config
+│           └── service/
+│               ├── EventServiceTest.java           # Service unit tests
+│               └── MetricsServiceTest.java         # Metrics unit tests
+├── design/
+│   └── openapi.yaml                                # OpenAPI 3.0 specification
+├── pom.xml                                         # Maven dependencies
+├── Dockerfile                                      # Multi-stage Docker build
+├── docker-compose.yml                              # Docker orchestration
+├── docker-manage.ps1                               # Docker management script
+├── .dockerignore                                   # Docker build exclusions
+├── README.md                                       # This file
+├── API_DOCUMENTATION.md                            # Complete API reference
+└── DOCKER_DEPLOYMENT.md                            # Docker deployment guide
+```
 
-stompClient.connect({}, function(frame) {
-    console.log('Connected: ' + frame);
-    
-    // Subscribe to event updates
-    stompClient.subscribe('/topic/events', function(message) {
-        const eventMessage = JSON.parse(message.body);
-        console.log('New event:', eventMessage);
-    });
-});
+## 🛠️ Technology Stack
 
-// Send message
-stompClient.send('/app/events', {}, JSON.stringify({
-    message: 'Hello from client'
-}));
+### Core Framework
+- **Spring Boot 3.2.0** - Application framework
+- **Java 17** - Programming language
+- **Maven** - Build and dependency management
+
+### Spring Modules
+- **Spring Web** - REST API endpoints
+- **Spring Data JPA** - Database access and JPQL queries
+- **Spring Security** - JWT authentication and authorization
+- **Spring WebSocket** - Real-time STOMP messaging
+- **Spring Boot Actuator** - Production monitoring
+
+### Database
+- **PostgreSQL 15** - Production database
+- **H2 Database** - In-memory database for development
+- **Hibernate** - JPA implementation
+
+### Security & Authentication
+- **Spring Security** - Security framework
+- **JJWT 0.11.5** - JWT token generation and validation
+
+### Documentation & API
+- **SpringDoc OpenAPI 2.3.0** - OpenAPI/Swagger integration
+- **Swagger UI 5.10.3** - Interactive API documentation
+
+### Testing
+- **JUnit 5** - Testing framework
+- **Mockito** - Mocking framework
+- **MockMvc** - Spring MVC testing
+- **AssertJ** - Fluent assertions
+- **Spring Security Test** - Security testing utilities
+
+### DevOps
+- **Docker** - Containerization
+- **Docker Compose** - Multi-container orchestration
+
+## 💻 Development
+
+### Build the Project
+
+```powershell
+mvn clean package
+```
+
+### Run Tests
+
+```powershell
+# Run all tests
+mvn test
+
+# Run specific test class
+mvn test -Dtest=EventServiceTest
+
+# Run with coverage
+mvn test jacoco:report
+```
+
+**Test Coverage**:
+- ✅ EventService: 10 unit tests
+- ✅ MetricsService: 6 unit tests
+- ✅ EventController: 10 unit tests + 9 integration tests
+
+### Run Locally (Development)
+
+```powershell
+mvn spring-boot:run
+```
+
+Application starts with H2 in-memory database on `http://localhost:8080`
+
+### Package for Deployment
+
+```powershell
+mvn clean package -DskipTests
+```
+
+JAR file created at: `target/eventpulse-0.0.1-SNAPSHOT.jar`
+
+### Run JAR
+
+```powershell
+java -jar target/eventpulse-0.0.1-SNAPSHOT.jar
+```
+
+## 📖 Complete API Workflow Example
+
+```powershell
+# 1. Start the application
+mvn spring-boot:run
+
+# 2. Login and get JWT token
+$response = Invoke-RestMethod -Method POST `
+  -Uri http://localhost:8080/api/auth/login `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body '{"username":"admin","password":"admin"}'
+$token = $response.token
+
+# 3. Create events
+$events = @(
+  @{source="user-service"; type="LOGIN"; message="User john logged in"; timestamp=(Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")},
+  @{source="payment-service"; type="PAYMENT"; message="Payment processed"; timestamp=(Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")},
+  @{source="user-service"; type="LOGOUT"; message="User john logged out"; timestamp=(Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")}
+)
+
+foreach ($event in $events) {
+  Invoke-RestMethod -Method POST `
+    -Uri http://localhost:8080/api/events `
+    -Headers @{ 
+      "Authorization" = "Bearer $token"
+      "Content-Type" = "application/json" 
+    } `
+    -Body ($event | ConvertTo-Json)
+}
+
+# 4. Get all events
+$allEvents = Invoke-RestMethod -Uri http://localhost:8080/api/events `
+  -Headers @{ "Authorization" = "Bearer $token" }
+$allEvents | ConvertTo-Json
+
+# 5. Get metrics
+$metrics = Invoke-RestMethod -Uri http://localhost:8080/api/metrics `
+  -Headers @{ "Authorization" = "Bearer $token" }
+$metrics | ConvertTo-Json
+
+# 6. Filter events by type
+$loginEvents = Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/events?type=LOGIN" `
+  -Headers @{ "Authorization" = "Bearer $token" }
+$loginEvents | ConvertTo-Json
+```
+
+## 🐳 Docker Deployment
+
+### Quick Docker Start
+
+```powershell
+# Using Docker Compose
+docker compose up -d --build
+
+# Or using the management script
+.\docker-manage.ps1 start
+```
+
+### Docker Management Script
+
+```powershell
+# Start services
+.\docker-manage.ps1 start
+
+# Check status
+.\docker-manage.ps1 status
+
+# View logs
+.\docker-manage.ps1 logs
+
+# Test application
+.\docker-manage.ps1 test
+
+# Backup database
+.\docker-manage.ps1 backup
+
+# Stop services
+.\docker-manage.ps1 stop
+
+# Clean up everything
+.\docker-manage.ps1 clean
+```
+
+### Docker Services
+
+- **postgres**: PostgreSQL 15 database with persistent storage
+- **eventpulse-backend**: Spring Boot application
+
+Both services include health checks and automatic restart policies.
+
+## 🧪 Testing
+
+### Using Swagger UI
+
+1. Open: http://localhost:8080/swagger-ui.html
+2. Test `/api/auth/login` to get a token
+3. Click **"Authorize"** button
+4. Enter: `Bearer <your-token>`
+5. Test all endpoints interactively
+
+### Using PowerShell
+
+See examples above or check [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
+
+### Using cURL
+
+```bash
+# Login
+curl.exe -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}'
+
+# Create event (replace <token> with actual token)
+curl.exe -X POST http://localhost:8080/api/events \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"source":"test","type":"INFO","message":"Test","timestamp":"2025-10-18T12:00:00Z"}'
 ```
 
 ## ⚙️ Configuration
 
-### Application Properties
+### Database Configuration
 
-Key configuration options in `application.yaml`:
-
+**H2 (Default)**:
 ```yaml
 spring:
-  application:
-    name: eventpulse
-  
+  datasource:
+    url: jdbc:h2:mem:eventpulse
+    driver-class-name: org.h2.Driver
+```
+
+**PostgreSQL**:
+```yaml
+spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/eventpulse
     username: eventpulse
     password: eventpulse
-  
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: false
+    driver-class-name: org.postgresql.Driver
+```
 
-server:
-  port: 8080
+### JWT Configuration
 
-# JWT Configuration
-app:
+```yaml
+security:
   jwt:
-    secret: your-secret-key-here
-    expiration: 86400000 # 24 hours
+    secret: <base64-encoded-secret-256-bits>
+    validity-ms: 3600000  # 1 hour
+```
 
-# OpenAPI Documentation
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
+**Environment Variables**:
+```powershell
+$env:JWT_SECRET = "your-base64-secret"
+$env:JWT_VALIDITY_MS = 7200000  # 2 hours
+```
 
-# Monitoring
+### Actuator Configuration
+
+```yaml
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
 ```
 
-### Environment Variables
+## 🔍 Troubleshooting
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SPRING_DATASOURCE_URL` | Database connection URL | `jdbc:postgresql://localhost:5432/eventpulse` |
-| `SPRING_DATASOURCE_USERNAME` | Database username | `eventpulse` |
-| `SPRING_DATASOURCE_PASSWORD` | Database password | `eventpulse` |
-| `APP_JWT_SECRET` | JWT signing secret | Generated |
-| `APP_JWT_EXPIRATION` | Token expiration (ms) | `86400000` |
-| `SERVER_PORT` | Application port | `8080` |
+### Application Won't Start
 
-### Database Configuration
-
-#### PostgreSQL Setup
-```sql
--- Create database
-CREATE DATABASE eventpulse;
-
--- Create user
-CREATE USER eventpulse WITH PASSWORD 'eventpulse';
-
--- Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE eventpulse TO eventpulse;
+**Check Java version**:
+```powershell
+java -version
+# Should be Java 17 or higher
 ```
 
-#### Connection Pool Settings
-```yaml
-spring:
-  datasource:
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+**Check port availability**:
+```powershell
+netstat -ano | findstr :8080
 ```
 
-## 🚀 Deployment
+### Database Connection Issues
 
-### Docker Deployment
+**Using H2** (default):
+- No external database needed
+- Access H2 console: http://localhost:8080/h2-console
 
-#### Production Docker Compose
-```yaml
-version: '3.8'
-services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: eventpulse
-      POSTGRES_USER: eventpulse
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-  eventpulse:
-    image: ghcr.io/your-org/eventpulse:latest
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventpulse
-      SPRING_DATASOURCE_USERNAME: eventpulse
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      APP_JWT_SECRET: ${JWT_SECRET}
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-
-volumes:
-  postgres_data:
-```
-
-#### Kubernetes Deployment
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: eventpulse
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: eventpulse
-  template:
-    metadata:
-      labels:
-        app: eventpulse
-    spec:
-      containers:
-      - name: eventpulse
-        image: ghcr.io/your-org/eventpulse:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: SPRING_DATASOURCE_URL
-          value: "jdbc:postgresql://postgres:5432/eventpulse"
-        - name: SPRING_DATASOURCE_USERNAME
-          value: "eventpulse"
-        - name: SPRING_DATASOURCE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: eventpulse-secrets
-              key: db-password
-        livenessProbe:
-          httpGet:
-            path: /api/health
-            port: 8080
-          initialDelaySeconds: 60
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-```
-
-### CI/CD Pipeline
-
-The project includes a comprehensive GitHub Actions CI/CD pipeline:
-
-- **Automated Testing** - Unit and integration tests
-- **Code Quality** - SpotBugs, Checkstyle, OWASP dependency check
-- **Security Scanning** - Vulnerability assessment
-- **Docker Build** - Multi-platform container images
-- **Deployment** - Automated staging and production deployments
-
-See [CI/CD Documentation](CICD_README.md) for detailed information.
-
-## 🛠️ Development
-
-### Project Structure
-
-```
-EventPulse/
-├── src/
-│   ├── main/
-│   │   ├── java/com/eventpulse/
-│   │   │   ├── config/          # Configuration classes
-│   │   │   ├── controller/      # REST controllers
-│   │   │   ├── dto/            # Data transfer objects
-│   │   │   ├── entity/         # JPA entities
-│   │   │   ├── exception/      # Exception handlers
-│   │   │   ├── repository/     # Data repositories
-│   │   │   ├── security/       # Security configuration
-│   │   │   └── service/        # Business logic
-│   │   └── resources/
-│   │       ├── application.yaml
-│   │       └── static/         # Static resources
-│   └── test/                   # Test classes
-├── design/
-│   └── openapi.yaml           # OpenAPI specification
-├── docker/                    # Docker configuration
-├── .github/
-│   └── workflows/            # GitHub Actions
-├── Dockerfile
-├── docker-compose.yaml
-└── pom.xml
-```
-
-### Development Setup
-
-1. **IDE Configuration**
-   - Install Java 21
-   - Configure Maven settings
-   - Install Lombok plugin
-   - Configure code style (Google Java Style)
-
-2. **Database Setup**
-   ```bash
-   # Start PostgreSQL
-   docker-compose up -d postgres
-   
-   # Verify connection
-   psql -h localhost -U eventpulse -d eventpulse
+**Using PostgreSQL**:
+1. Ensure PostgreSQL is running:
+   ```powershell
+   docker compose ps postgres
+   ```
+2. Check database logs:
+   ```powershell
+   docker compose logs postgres
    ```
 
-3. **Running Tests**
-   ```bash
-   # All tests
-   mvn test
-   
-   # Unit tests only
-   mvn test -Dtest="*Test"
-   
-   # Integration tests only
-   mvn test -Dtest="*IntegrationTest"
-   
-   # With coverage
-   mvn clean test jacoco:report
-   ```
+### Swagger UI Issues
 
-4. **Code Quality Checks**
-   ```bash
-   # Checkstyle
-   mvn checkstyle:check
-   
-   # SpotBugs
-   mvn spotbugs:check
-   
-   # OWASP dependency check
-   mvn org.owasp:dependency-check-maven:check
-   ```
+**Can't access Swagger UI**:
+1. Verify application is running: http://localhost:8080/api/health
+2. Check URL: http://localhost:8080/swagger-ui.html (note the `.html`)
+3. Clear browser cache
+4. Check application logs for errors
 
-### Adding New Features
+**401/403 errors in Swagger UI**:
+1. Login via `/api/auth/login` endpoint in Swagger
+2. Copy the JWT token from response
+3. Click "Authorize" button (🔒 icon)
+4. Enter: `Bearer <token>`
+5. Click "Authorize" and "Close"
 
-1. **Create Feature Branch**
-   ```bash
-   git checkout -b feature/new-feature
-   ```
+### JWT Token Issues
 
-2. **Implement Changes**
-   - Add tests first (TDD approach)
-   - Implement business logic
-   - Add API documentation
-   - Update configuration if needed
+**Token expired**:
+- Default expiry: 1 hour
+- Request a new token via `/api/auth/login`
 
-3. **Test Changes**
-   ```bash
-   mvn clean test
-   mvn checkstyle:check
-   mvn spotbugs:check
-   ```
+**Invalid token**:
+- Ensure you're using the format: `Bearer <token>`
+- Don't include quotes around the token
+- Token should start with `eyJ...`
 
-4. **Create Pull Request**
-   - Use the provided PR template
-   - Ensure all checks pass
-   - Request code review
+### WebSocket Connection Issues
 
-## 🧪 Testing
+1. Ensure `/ws` endpoint is accessible
+2. Check browser console for errors
+3. Verify STOMP connection in ws-client.html
+4. Check application logs for WebSocket errors
 
-### Test Strategy
+## 📚 Complete Documentation
 
-- **Unit Tests** - Service layer and utility classes
-- **Integration Tests** - Controller layer with MockMvc
-- **Repository Tests** - Database integration
-- **Security Tests** - Authentication and authorization
-- **Contract Tests** - API contracts and OpenAPI spec
-
-### Running Tests
-
-```bash
-# All tests
-mvn clean test
-
-# Specific test class
-mvn test -Dtest=EventServiceTest
-
-# Tests with coverage
-mvn clean test jacoco:report
-
-# Integration tests
-mvn verify -DskipUnitTests
-```
-
-### Test Coverage
-
-The project maintains a minimum of 60% code coverage. Coverage reports are generated using JaCoCo and are available at:
-- **Local**: `target/site/jacoco/index.html`
-- **CI/CD**: GitHub Actions artifacts
-
-### Test Data
-
-Test data is managed through:
-- **Test fixtures** - Static test data
-- **Test builders** - Dynamic test data generation
-- **Test containers** - Isolated database instances
-
-## 📊 Monitoring
-
-### Health Checks
-
-EventPulse provides comprehensive health monitoring:
-
-```bash
-# Basic health check
-curl http://localhost:8080/api/health
-
-# Detailed health information
-curl http://localhost:8080/actuator/health
-
-# Application metrics
-curl http://localhost:8080/actuator/metrics
-```
-
-### Monitoring Endpoints
-
-| Endpoint | Description | Access |
-|----------|-------------|---------|
-| `/api/health` | Basic health status | Public |
-| `/actuator/health` | Detailed health info | Public |
-| `/actuator/metrics` | Application metrics | Public |
-| `/actuator/info` | Application information | Public |
-| `/actuator/env` | Environment properties | Protected |
-
-### Logging
-
-Logging is configured with appropriate levels:
-
-```yaml
-logging:
-  level:
-    com.eventpulse: INFO
-    org.springframework.web: INFO
-    org.springframework.security: WARN
-    org.hibernate.SQL: WARN
-```
-
-### Metrics
-
-Custom metrics are exposed for:
-- **Event counts** - Total events, events by type/source
-- **API performance** - Response times, request counts
-- **Database performance** - Query times, connection pool stats
-- **JVM metrics** - Memory usage, GC statistics
+| Document | Description |
+|----------|-------------|
+| **[README.md](README.md)** | Main documentation (this file) - Quick start and overview |
+| **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** | Complete API reference with examples in Python/Java/Node.js |
+| **[DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)** | Docker deployment guide and best practices |
+| **[CICD_DOCUMENTATION.md](CICD_DOCUMENTATION.md)** | GitHub Actions CI/CD setup and workflows |
+| **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** | One-page cheat sheet for common tasks |
+| **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** | Project overview, metrics, and architecture |
+| **[design/openapi.yaml](design/openapi.yaml)** | OpenAPI 3.0 specification for API contract |
 
 ## 🤝 Contributing
 
-We welcome contributions! Please follow these guidelines:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### Development Process
+## 📝 API Specification
 
-1. **Fork the repository**
-2. **Create a feature branch**
-3. **Make your changes**
-4. **Add tests** for new functionality
-5. **Ensure all tests pass**
-6. **Update documentation**
-7. **Create a pull request**
+The complete OpenAPI 3.0 specification is available at:
+- **Static file**: `design/openapi.yaml`
+- **JSON endpoint**: http://localhost:8080/v3/api-docs
+- **YAML endpoint**: http://localhost:8080/v3/api-docs.yaml
 
-### Code Standards
+Import this into:
+- Postman
+- Insomnia
+- API testing tools
+- Code generators
 
-- **Java Code Style**: Google Java Style Guide
-- **Test Coverage**: Minimum 60%
-- **Documentation**: JavaDoc for public APIs
-- **Security**: No hardcoded secrets or credentials
+## 🚦 Health & Status
 
-### Pull Request Process
+### Check Application Health
 
-1. **Use the PR template**
-2. **Ensure CI/CD checks pass**
-3. **Request code review**
-4. **Address feedback**
-5. **Merge after approval**
+```powershell
+# Simple health check
+curl http://localhost:8080/api/health
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+# Detailed health (database, disk space, etc.)
+curl http://localhost:8080/actuator/health
 
-## 🔮 Future Enhancements
+# Kubernetes liveness probe
+curl http://localhost:8080/actuator/health/liveness
 
-### Planned Features
+# Kubernetes readiness probe
+curl http://localhost:8080/actuator/health/readiness
+```
 
-#### Phase 1 - Enhanced Analytics
-- **Advanced Metrics** - Custom metric definitions
-- **Dashboard** - Real-time analytics dashboard
-- **Alerting** - Configurable alerts and notifications
-- **Data Export** - CSV/JSON export functionality
+### Monitor Metrics
 
-#### Phase 2 - Scalability
-- **Event Streaming** - Apache Kafka integration
-- **Caching** - Redis-based caching layer
-- **Load Balancing** - Multi-instance deployment
-- **Auto-scaling** - Kubernetes HPA support
+```powershell
+# List available metrics
+curl http://localhost:8080/actuator/metrics
 
-#### Phase 3 - Advanced Features
-- **Event Correlation** - Pattern detection and analysis
-- **Machine Learning** - Anomaly detection
-- **Multi-tenancy** - Tenant isolation and management
-- **API Rate Limiting** - Request throttling and quotas
+# JVM memory usage
+curl http://localhost:8080/actuator/metrics/jvm.memory.used
 
-#### Phase 4 - Enterprise Features
-- **Audit Logging** - Comprehensive audit trails
-- **Backup & Recovery** - Automated backup strategies
-- **Disaster Recovery** - Multi-region deployment
-- **Compliance** - GDPR, SOC2 compliance features
+# HTTP request metrics
+curl http://localhost:8080/actuator/metrics/http.server.requests
 
-### Technology Roadmap
+# Database connection pool
+curl http://localhost:8080/actuator/metrics/hikaricp.connections.active
+```
 
-| Phase | Timeline | Technologies |
-|-------|----------|--------------|
-| **Phase 1** | Q1 2024 | Enhanced Spring Boot, React Dashboard |
-| **Phase 2** | Q2 2024 | Apache Kafka, Redis, Kubernetes |
-| **Phase 3** | Q3 2024 | Apache Flink, TensorFlow, Multi-tenancy |
-| **Phase 4** | Q4 2024 | Enterprise security, Compliance tools |
+## 🎓 Learning Resources
 
-### Community Contributions
-
-We encourage community contributions for:
-- **Bug fixes** - Issues and improvements
-- **New features** - Feature requests and implementations
-- **Documentation** - Guides and tutorials
-- **Testing** - Additional test coverage
-- **Performance** - Optimization and benchmarking
-
-### Getting Involved
-
-- **GitHub Issues** - Report bugs and request features
-- **Discussions** - Join community discussions
-- **Pull Requests** - Contribute code changes
-- **Documentation** - Improve guides and examples
+- [Spring Boot Documentation](https://docs.spring.io/spring-boot/)
+- [Spring Security JWT Guide](https://docs.spring.io/spring-security/)
+- [Spring WebSocket Guide](https://docs.spring.io/spring-framework/reference/web/websocket.html)
+- [SpringDoc Documentation](https://springdoc.org/)
+- [Docker Documentation](https://docs.docker.com/)
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is created for demonstration purposes.
 
-## 🙏 Acknowledgments
+## 🎯 Next Steps
 
-- **Spring Boot** - Application framework
-- **PostgreSQL** - Database system
-- **Docker** - Containerization platform
-- **GitHub Actions** - CI/CD platform
-- **OpenAPI** - API documentation standard
-
-## 📞 Support
-
-### Getting Help
-
-- **Documentation** - Check this README and related docs
-- **Issues** - Create GitHub issues for bugs and features
-- **Discussions** - Use GitHub Discussions for questions
-- **Email** - Contact the maintainers directly
-
-### Resources
-
-- [API Documentation](http://localhost:8080/swagger-ui.html)
-- [Docker Guide](DOCKER_README.md)
-- [CI/CD Guide](CICD_README.md)
-- [Observability Guide](OBSERVABILITY_README.md)
-- [Development Guide](DEVELOPMENT.md)
+1. **Explore Swagger UI**: http://localhost:8080/swagger-ui.html
+2. **Test WebSocket**: http://localhost:8080/ws-client.html
+3. **Monitor Health**: http://localhost:8080/actuator/health
+4. **Deploy with Docker**: `docker compose up -d --build`
 
 ---
 
-**EventPulse** - Empowering event-driven architectures with modern technology and comprehensive analytics.
-
-[⬆ Back to Top](#eventpulse)
+**Built with ❤️ using Spring Boot**

@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: eventpulse-postgres
+    environment:
+      POSTGRES_DB: eventpulse
+      POSTGRES_USER: eventpulse
+      POSTGRES_PASSWORD: eventpulse
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - eventpulse-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventpulse -d eventpulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  eventpulse-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eventpulse-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventpulse
+      SPRING_DATASOURCE_USERNAME: eventpulse
+      SPRING_DATASOURCE_PASSWORD: eventpulse
+      JWT_SECRET: ${JWT_SECRET:-RXZlbnRQdWxzZVNlY3VyZUtleUZvckpXVEF1dGhlbnRpY2F0aW9uMjU2Qml0cw==}
+      JWT_VALIDITY_MS: ${JWT_VALIDITY_MS:-3600000}
+    ports:
+      - "8080:8080"
+    networks:
+      - eventpulse-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  eventpulse-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

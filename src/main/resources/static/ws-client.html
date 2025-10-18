@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EventPulse WebSocket Client</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    #log { white-space: pre-wrap; border: 1px solid #ddd; padding: 12px; height: 280px; overflow: auto; background: #fafafa; }
+    input, button { padding: 8px 12px; margin: 4px 0; }
+  </style>
+  <script>
+    let stompClient;
+
+    function log(message) {
+      const el = document.getElementById('log');
+      el.textContent += message + "\n";
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function connectWs() {
+      const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+      const socket = new WebSocket(url);
+      socket.onopen = () => {
+        log('WebSocket connected. Upgrading to STOMP...');
+        // Minimal STOMP frame handshake
+        socket.send('CONNECT\naccept-version:1.2\n\n\u0000');
+      };
+      socket.onmessage = (event) => {
+        const data = event.data;
+        if (data.startsWith('CONNECTED')) {
+          log('STOMP connected');
+          const subId = 'sub-1';
+          socket.send('SUBSCRIBE\nid:' + subId + '\ndestination:/topic/events\n\n\u0000');
+          log('Subscribed to /topic/events');
+        } else if (data.startsWith('MESSAGE')) {
+          const body = data.split('\n\n')[1]?.replace('\u0000','');
+          log('Event: ' + body);
+        } else {
+          log('Frame: ' + data);
+        }
+      };
+      socket.onclose = () => log('WebSocket closed');
+      socket.onerror = (e) => log('WebSocket error: ' + e.message);
+    }
+
+    async function postSample() {
+      const event = {
+        source: document.getElementById('source').value || 'ws-client',
+        type: document.getElementById('type').value || 'INFO',
+        message: document.getElementById('message').value || 'Hello from ws client',
+        timestamp: new Date().toISOString()
+      };
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event)
+      });
+      log('POST /api/events status: ' + res.status);
+    }
+  </script>
+  </head>
+  <body>
+    <h1>EventPulse WebSocket Client</h1>
+    <button onclick="connectWs()">Connect</button>
+    <div id="log"></div>
+    <h3>Create Sample Event</h3>
+    <input id="source" placeholder="source" />
+    <input id="type" placeholder="type" />
+    <input id="message" placeholder="message" style="width:260px" />
+    <br />
+    <button onclick="postSample()">Send Event (HTTP)</button>
+  </body>
+</html>
+
+

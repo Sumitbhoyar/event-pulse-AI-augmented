@@ -3,23 +3,18 @@ package com.eventpulse.service;
 import com.eventpulse.dto.MetricsResponse;
 import com.eventpulse.repository.EventRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("MetricsService Tests")
 class MetricsServiceTest {
 
     @Mock
@@ -28,299 +23,166 @@ class MetricsServiceTest {
     @InjectMocks
     private MetricsService metricsService;
 
-    private Instant testStartTime;
-    private Instant testEndTime;
-
     @BeforeEach
     void setUp() {
-        testStartTime = Instant.now().minusSeconds(3600);
-        testEndTime = Instant.now();
     }
 
     @Test
-    @DisplayName("Should get all metrics successfully")
-    void shouldGetAllMetricsSuccessfully() {
-        // Given
-        Long totalEvents = 100L;
-        List<Object[]> eventsByType = Arrays.asList(
-                new Object[]{"login", 50L},
-                new Object[]{"error", 30L},
-                new Object[]{"logout", 20L}
+    void getMetrics_WithEvents_ShouldReturnCorrectMetrics() {
+        // Arrange
+        when(eventRepository.countAllEvents()).thenReturn(100L);
+        
+        List<Object[]> typeData = Arrays.asList(
+                new Object[]{"LOGIN", 40L},
+                new Object[]{"LOGOUT", 30L},
+                new Object[]{"ERROR", 30L}
         );
-        List<Object[]> eventsBySource = Arrays.asList(
+        when(eventRepository.countByType()).thenReturn(typeData);
+
+        List<Object[]> sourceData = Arrays.asList(
                 new Object[]{"user-service", 60L},
-                new Object[]{"auth-service", 40L}
+                new Object[]{"payment-service", 40L}
         );
+        when(eventRepository.countBySource()).thenReturn(sourceData);
 
-        when(eventRepository.getTotalEventCount()).thenReturn(totalEvents);
-        when(eventRepository.getEventCountByType()).thenReturn(eventsByType);
-        when(eventRepository.getEventCountBySource()).thenReturn(eventsBySource);
+        // Act
+        MetricsResponse result = metricsService.getMetrics();
 
-        // When
-        MetricsResponse response = metricsService.getAllMetrics();
-
-        // Then
-        assertNotNull(response);
-        assertEquals(100L, response.getTotalEvents());
-        assertEquals(3, response.getEventsByType().size());
-        assertEquals(2, response.getEventsBySource().size());
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getTotalCount()).isEqualTo(100L);
         
-        // Verify type counts
-        assertEquals("login", response.getEventsByType().get(0).getType());
-        assertEquals(50L, response.getEventsByType().get(0).getCount());
-        assertEquals("error", response.getEventsByType().get(1).getType());
-        assertEquals(30L, response.getEventsByType().get(1).getCount());
+        assertThat(result.getCountByType()).hasSize(3);
+        assertThat(result.getCountByType().get("LOGIN")).isEqualTo(40L);
+        assertThat(result.getCountByType().get("LOGOUT")).isEqualTo(30L);
+        assertThat(result.getCountByType().get("ERROR")).isEqualTo(30L);
         
-        // Verify source counts
-        assertEquals("user-service", response.getEventsBySource().get(0).getSource());
-        assertEquals(60L, response.getEventsBySource().get(0).getCount());
-        assertEquals("auth-service", response.getEventsBySource().get(1).getSource());
-        assertEquals(40L, response.getEventsBySource().get(1).getCount());
+        assertThat(result.getCountBySource()).hasSize(2);
+        assertThat(result.getCountBySource().get("user-service")).isEqualTo(60L);
+        assertThat(result.getCountBySource().get("payment-service")).isEqualTo(40L);
 
-        verify(eventRepository, times(1)).getTotalEventCount();
-        verify(eventRepository, times(1)).getEventCountByType();
-        verify(eventRepository, times(1)).getEventCountBySource();
+        verify(eventRepository, times(1)).countAllEvents();
+        verify(eventRepository, times(1)).countByType();
+        verify(eventRepository, times(1)).countBySource();
     }
 
     @Test
-    @DisplayName("Should get metrics by time range successfully")
-    void shouldGetMetricsByTimeRangeSuccessfully() {
-        // Given
-        Long totalEvents = 50L;
-        List<Object[]> eventsByType = Arrays.asList(
-                new Object[]{"login", 25L},
-                new Object[]{"error", 15L},
-                new Object[]{"logout", 10L}
+    void getMetrics_NoEvents_ShouldReturnZeroMetrics() {
+        // Arrange
+        when(eventRepository.countAllEvents()).thenReturn(0L);
+        when(eventRepository.countByType()).thenReturn(Collections.emptyList());
+        when(eventRepository.countBySource()).thenReturn(Collections.emptyList());
+
+        // Act
+        MetricsResponse result = metricsService.getMetrics();
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getTotalCount()).isEqualTo(0L);
+        assertThat(result.getCountByType()).isEmpty();
+        assertThat(result.getCountBySource()).isEmpty();
+    }
+
+    @Test
+    void getMetrics_NullValuesInData_ShouldHandleGracefully() {
+        // Arrange
+        when(eventRepository.countAllEvents()).thenReturn(50L);
+        
+        List<Object[]> typeData = Arrays.asList(
+                new Object[]{null, 10L},
+                new Object[]{"INFO", null},
+                new Object[]{"ERROR", 20L}
         );
-        List<Object[]> eventsBySource = Arrays.asList(
-                new Object[]{"user-service", 30L},
-                new Object[]{"auth-service", 20L}
+        when(eventRepository.countByType()).thenReturn(typeData);
+
+        List<Object[]> sourceData = new ArrayList<>();
+        sourceData.add(new Object[]{"service1", 30L});
+        when(eventRepository.countBySource()).thenReturn(sourceData);
+
+        // Act
+        MetricsResponse result = metricsService.getMetrics();
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getTotalCount()).isEqualTo(50L);
+        assertThat(result.getCountByType()).containsKeys("", "INFO", "ERROR");
+        assertThat(result.getCountByType().get("")).isEqualTo(10L);
+        assertThat(result.getCountByType().get("INFO")).isEqualTo(0L);
+        assertThat(result.getCountByType().get("ERROR")).isEqualTo(20L);
+    }
+
+    @Test
+    void getMetrics_EmptyArraysInData_ShouldSkip() {
+        // Arrange
+        when(eventRepository.countAllEvents()).thenReturn(10L);
+        
+        List<Object[]> typeData = new ArrayList<>();
+        typeData.add(null);
+        typeData.add(new Object[]{});
+        typeData.add(new Object[]{"INFO"});
+        typeData.add(new Object[]{"ERROR", 10L});
+        when(eventRepository.countByType()).thenReturn(typeData);
+
+        when(eventRepository.countBySource()).thenReturn(Collections.emptyList());
+
+        // Act
+        MetricsResponse result = metricsService.getMetrics();
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getTotalCount()).isEqualTo(10L);
+        assertThat(result.getCountByType()).containsKey("ERROR");
+        assertThat(result.getCountByType().get("ERROR")).isEqualTo(10L);
+    }
+
+    @Test
+    void getMetrics_SingleEvent_ShouldReturnCorrectCounts() {
+        // Arrange
+        when(eventRepository.countAllEvents()).thenReturn(1L);
+        
+        List<Object[]> typeData = Collections.singletonList(
+                new Object[]{"LOGIN", 1L}
         );
+        when(eventRepository.countByType()).thenReturn(typeData);
 
-        when(eventRepository.getTotalEventCountByTimeRange(testStartTime, testEndTime)).thenReturn(totalEvents);
-        when(eventRepository.getEventCountByTypeInTimeRange(testStartTime, testEndTime)).thenReturn(eventsByType);
-        when(eventRepository.getEventCountBySourceInTimeRange(testStartTime, testEndTime)).thenReturn(eventsBySource);
-
-        // When
-        MetricsResponse response = metricsService.getMetricsByTimeRange(testStartTime, testEndTime);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(50L, response.getTotalEvents());
-        assertEquals(3, response.getEventsByType().size());
-        assertEquals(2, response.getEventsBySource().size());
-
-        verify(eventRepository, times(1)).getTotalEventCountByTimeRange(testStartTime, testEndTime);
-        verify(eventRepository, times(1)).getEventCountByTypeInTimeRange(testStartTime, testEndTime);
-        verify(eventRepository, times(1)).getEventCountBySourceInTimeRange(testStartTime, testEndTime);
-    }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException for invalid time range")
-    void shouldThrowIllegalArgumentExceptionForInvalidTimeRange() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> metricsService.getMetricsByTimeRange(testEndTime, testStartTime)
+        List<Object[]> sourceData = Collections.singletonList(
+                new Object[]{"api", 1L}
         );
+        when(eventRepository.countBySource()).thenReturn(sourceData);
 
-        assertTrue(exception.getMessage().contains("Start time cannot be after end time"));
-        verify(eventRepository, never()).getTotalEventCountByTimeRange(any(), any());
+        // Act
+        MetricsResponse result = metricsService.getMetrics();
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getTotalCount()).isEqualTo(1L);
+        assertThat(result.getCountByType()).hasSize(1);
+        assertThat(result.getCountBySource()).hasSize(1);
     }
 
     @Test
-    @DisplayName("Should throw IllegalArgumentException for null time range")
-    void shouldThrowIllegalArgumentExceptionForNullTimeRange() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> metricsService.getMetricsByTimeRange(null, testEndTime)
+    void getMetrics_LargeCounts_ShouldHandleCorrectly() {
+        // Arrange
+        when(eventRepository.countAllEvents()).thenReturn(1000000L);
+        
+        List<Object[]> typeData = Arrays.asList(
+                new Object[]{"TYPE1", 500000L},
+                new Object[]{"TYPE2", 500000L}
         );
+        when(eventRepository.countByType()).thenReturn(typeData);
 
-        assertTrue(exception.getMessage().contains("Both start and end times must be provided"));
-        verify(eventRepository, never()).getTotalEventCountByTimeRange(any(), any());
-    }
+        List<Object[]> sourceData = new ArrayList<>();
+        sourceData.add(new Object[]{"source1", 1000000L});
+        when(eventRepository.countBySource()).thenReturn(sourceData);
 
-    @Test
-    @DisplayName("Should get recent metrics successfully")
-    void shouldGetRecentMetricsSuccessfully() {
-        // Given
-        int hours = 24;
-        Long totalEvents = 25L;
-        List<Object[]> eventsByType = Arrays.asList(
-                new Object[]{"login", 15L},
-                new Object[]{"error", 10L}
-        );
-        List<Object[]> eventsBySource = Arrays.asList(
-                new Object[]{"user-service", 20L},
-                new Object[]{"auth-service", 5L}
-        );
+        // Act
+        MetricsResponse result = metricsService.getMetrics();
 
-        when(eventRepository.getTotalEventCountByTimeRange(any(Instant.class), any(Instant.class))).thenReturn(totalEvents);
-        when(eventRepository.getEventCountByTypeInTimeRange(any(Instant.class), any(Instant.class))).thenReturn(eventsByType);
-        when(eventRepository.getEventCountBySourceInTimeRange(any(Instant.class), any(Instant.class))).thenReturn(eventsBySource);
-
-        // When
-        MetricsResponse response = metricsService.getRecentMetrics(hours);
-
-        // Then
-        assertNotNull(response);
-        assertEquals(25L, response.getTotalEvents());
-        assertEquals(2, response.getEventsByType().size());
-        assertEquals(2, response.getEventsBySource().size());
-
-        verify(eventRepository, times(1)).getTotalEventCountByTimeRange(any(Instant.class), any(Instant.class));
-        verify(eventRepository, times(1)).getEventCountByTypeInTimeRange(any(Instant.class), any(Instant.class));
-        verify(eventRepository, times(1)).getEventCountBySourceInTimeRange(any(Instant.class), any(Instant.class));
-    }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException for invalid hours")
-    void shouldThrowIllegalArgumentExceptionForInvalidHours() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> metricsService.getRecentMetrics(-1)
-        );
-
-        assertTrue(exception.getMessage().contains("Hours must be a positive number"));
-        verify(eventRepository, never()).getTotalEventCountByTimeRange(any(), any());
-    }
-
-    @Test
-    @DisplayName("Should get event count by type successfully")
-    void shouldGetEventCountByTypeSuccessfully() {
-        // Given
-        String eventType = "login";
-        Long count = 45L;
-        when(eventRepository.getEventCountBySpecificType(eventType)).thenReturn(count);
-
-        // When
-        Long result = metricsService.getEventCountByType(eventType);
-
-        // Then
-        assertEquals(45L, result);
-        verify(eventRepository, times(1)).getEventCountBySpecificType(eventType);
-    }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException for blank type")
-    void shouldThrowIllegalArgumentExceptionForBlankType() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> metricsService.getEventCountByType("")
-        );
-
-        assertTrue(exception.getMessage().contains("Event type cannot be blank"));
-        verify(eventRepository, never()).getEventCountBySpecificType(any());
-    }
-
-    @Test
-    @DisplayName("Should get event count by source successfully")
-    void shouldGetEventCountBySourceSuccessfully() {
-        // Given
-        String eventSource = "user-service";
-        Long count = 60L;
-        when(eventRepository.getEventCountBySpecificSource(eventSource)).thenReturn(count);
-
-        // When
-        Long result = metricsService.getEventCountBySource(eventSource);
-
-        // Then
-        assertEquals(60L, result);
-        verify(eventRepository, times(1)).getEventCountBySpecificSource(eventSource);
-    }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException for blank source")
-    void shouldThrowIllegalArgumentExceptionForBlankSource() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> metricsService.getEventCountBySource("   ")
-        );
-
-        assertTrue(exception.getMessage().contains("Event source cannot be blank"));
-        verify(eventRepository, never()).getEventCountBySpecificSource(any());
-    }
-
-    @Test
-    @DisplayName("Should get total event count successfully")
-    void shouldGetTotalEventCountSuccessfully() {
-        // Given
-        Long totalCount = 150L;
-        when(eventRepository.getTotalEventCount()).thenReturn(totalCount);
-
-        // When
-        Long result = metricsService.getTotalEventCount();
-
-        // Then
-        assertEquals(150L, result);
-        verify(eventRepository, times(1)).getTotalEventCount();
-    }
-
-    @Test
-    @DisplayName("Should get recent events count successfully")
-    void shouldGetRecentEventsCountSuccessfully() {
-        // Given
-        int hours = 12;
-        Long recentCount = 25L;
-        when(eventRepository.getRecentEventsCount(any(Instant.class))).thenReturn(recentCount);
-
-        // When
-        Long result = metricsService.getRecentEventsCount(hours);
-
-        // Then
-        assertEquals(25L, result);
-        verify(eventRepository, times(1)).getRecentEventsCount(any(Instant.class));
-    }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException for invalid hours in recent count")
-    void shouldThrowIllegalArgumentExceptionForInvalidHoursInRecentCount() {
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> metricsService.getRecentEventsCount(0)
-        );
-
-        assertTrue(exception.getMessage().contains("Hours must be a positive number"));
-        verify(eventRepository, never()).getRecentEventsCount(any());
-    }
-
-    @Test
-    @DisplayName("Should throw MetricsServiceException when repository fails")
-    void shouldThrowMetricsServiceExceptionWhenRepositoryFails() {
-        // Given
-        when(eventRepository.getTotalEventCount())
-                .thenThrow(new RuntimeException("Database connection failed"));
-
-        // When & Then
-        MetricsService.MetricsServiceException exception = assertThrows(
-                MetricsService.MetricsServiceException.class,
-                () -> metricsService.getAllMetrics()
-        );
-
-        assertTrue(exception.getMessage().contains("Failed to retrieve metrics"));
-        verify(eventRepository, times(1)).getTotalEventCount();
-    }
-
-    @Test
-    @DisplayName("Should handle empty results gracefully")
-    void shouldHandleEmptyResultsGracefully() {
-        // Given
-        when(eventRepository.getTotalEventCount()).thenReturn(0L);
-        when(eventRepository.getEventCountByType()).thenReturn(Arrays.asList());
-        when(eventRepository.getEventCountBySource()).thenReturn(Arrays.asList());
-
-        // When
-        MetricsResponse response = metricsService.getAllMetrics();
-
-        // Then
-        assertNotNull(response);
-        assertEquals(0L, response.getTotalEvents());
-        assertEquals(0, response.getEventsByType().size());
-        assertEquals(0, response.getEventsBySource().size());
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getTotalCount()).isEqualTo(1000000L);
+        assertThat(result.getCountByType().get("TYPE1")).isEqualTo(500000L);
+        assertThat(result.getCountByType().get("TYPE2")).isEqualTo(500000L);
     }
 }
+

@@ -1,40 +1,70 @@
-# Prompt 1 — Project Initialization
+# Phase 1: Project Initialization
 
-> Create a new **Spring Boot (Maven)** project named `eventpulse`.  
-> Include dependencies:
-> - Spring Web  
-> - Spring Data JPA  
-> - PostgreSQL Driver  
-> - Lombok  
-> - Validation  
-> - Spring Boot Actuator  
-> Use Java 21 and package name `com.eventpulse`.  
-> Configure `application.yaml` for PostgreSQL connection (host=localhost, db=eventpulse, user=eventpulse, pass=eventpulse).  
-> Create a simple root controller `/api/health` returning `{ "status": "OK" }`.
+## Objective
+Create a new Spring Boot (Maven) project with basic structure and PostgreSQL configuration.
 
-## Implementation Summary
+## Requirements
 
-This prompt established the foundation of the EventPulse project by:
+- Project name: `eventpulse`
+- Build tool: Maven
+- Java version: 21 (later changed to 17 for compatibility)
+- Package name: `com.eventpulse`
 
-### Files Created:
-- `pom.xml` - Maven configuration with all required dependencies
-- `src/main/java/com/eventpulse/EventPulseApplication.java` - Main Spring Boot application class
-- `src/main/resources/application.yaml` - Database and application configuration
-- `src/main/java/com/eventpulse/controller/HealthController.java` - Health check endpoint
+### Dependencies
+- Spring Web
+- Spring Data JPA
+- PostgreSQL Driver
+- Lombok (later removed due to annotation processing issues)
+- Validation
+- Spring Boot Actuator
 
-### Key Features Implemented:
-- Spring Boot 3.2.0 with Java 21
-- PostgreSQL database configuration
-- Health check endpoint at `/api/health`
-- Proper package structure following `com.eventpulse` naming convention
-- Maven build configuration with all requested dependencies
+### Configuration
+- PostgreSQL connection: host=localhost, db=eventpulse, user=eventpulse, pass=eventpulse
+- Simple health controller at `/api/health` returning `{"status": "OK"}`
 
-### Dependencies Added:
-- `spring-boot-starter-web` - REST API support
-- `spring-boot-starter-data-jpa` - Database access
-- `postgresql` - Database driver
-- `lombok` - Code generation
-- `spring-boot-starter-validation` - Input validation
-- `spring-boot-starter-actuator` - Monitoring endpoints
+## Implementation Steps
 
-This initial setup provided a solid foundation for building the event management platform.
+1. Created `pom.xml` with Spring Boot 3.2.0 parent
+2. Added all required dependencies
+3. Created `src/main/resources/application.yaml` with PostgreSQL configuration
+4. Created main application class `EventpulseApplication.java`
+5. Created `HealthController.java` with `/api/health` endpoint
+
+## Files Created
+
+- `pom.xml`
+- `src/main/resources/application.yaml`
+- `src/main/java/com/eventpulse/EventpulseApplication.java`
+- `src/main/java/com/eventpulse/controller/HealthController.java`
+
+## Challenges Encountered
+
+### PostgreSQL Connection Error
+**Problem**: Application failed to start due to PostgreSQL not running locally.
+
+**Solutions Provided**:
+1. Docker Compose setup for PostgreSQL
+2. H2 in-memory database as alternative
+3. Updated configuration to use H2 by default
+
+### Lombok Annotation Processing
+**Problem**: Lombok annotations weren't generating getter/setter/builder methods, causing compilation errors.
+
+**Solution**: Removed Lombok dependency and manually implemented:
+- Getter/setter methods
+- Builder pattern
+- Constructors
+
+## Key Decisions
+
+1. **Java 17 vs 21**: Changed from Java 21 to 17 due to Maven compiler plugin compatibility
+2. **H2 as Default**: Configured H2 as default database for easier development
+3. **Manual POJOs**: Removed Lombok in favor of manual implementations for reliability
+
+## Outcome
+
+✅ Basic Spring Boot project successfully created  
+✅ Health endpoint working  
+✅ Application compiles and runs  
+✅ H2 in-memory database configured
+

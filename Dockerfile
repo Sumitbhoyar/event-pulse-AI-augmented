@@ -1,57 +1,52 @@
-# Multi-stage build for Spring Boot application
-FROM openjdk:21-jdk-slim as builder
+# Multi-stage Dockerfile for EventPulse Spring Boot Application
 
-# Set working directory
+# Stage 1: Build stage
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+
 WORKDIR /app
 
-# Copy Maven files
+# Copy pom.xml and download dependencies (cached layer)
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
-
-# Download dependencies (this layer will be cached if pom.xml doesn't change)
-RUN ./mvnw dependency:go-offline -B
+RUN mvn dependency:go-offline -B
 
 # Copy source code
-COPY src src
+COPY src ./src
 
-# Build the application
-RUN ./mvnw clean package -DskipTests
+# Build the application (skip tests for faster builds)
+RUN mvn clean package -DskipTests -B
 
-# Runtime stage
-FROM openjdk:21-jre-slim
+# Stage 2: Runtime stage
+FROM eclipse-temurin:17-jre-alpine
 
-# Install curl and postgresql-client for health checks and database waiting
-RUN apt-get update && apt-get install -y curl postgresql-client && rm -rf /var/lib/apt/lists/*
-
-# Create app user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Set working directory
 WORKDIR /app
 
-# Copy the built jar from builder stage
-COPY --from=builder /app/target/eventpulse-*.jar app.jar
+# Create non-root user for security
+RUN addgroup -S spring && adduser -S spring -G spring
 
-# Copy wait script
-COPY docker/scripts/wait-for-db.sh /app/wait-for-db.sh
-RUN chmod +x /app/wait-for-db.sh
+# Copy the built JAR from build stage
+COPY --from=build /app/target/eventpulse-*.jar app.jar
 
-# Change ownership to app user
-RUN chown appuser:appuser app.jar /app/wait-for-db.sh
+# Change ownership to non-root user
+RUN chown spring:spring app.jar
 
 # Switch to non-root user
-USER appuser
+USER spring:spring
 
-# Expose port
+# Expose application port
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
-# Set JVM options for containerized environment
-ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+# Run the application with production profile
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", \
+  "app.jar"]
 
-# Start the application with database wait script
-ENTRYPOINT ["/app/wait-for-db.sh", "sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Default to docker profile (can be overridden)
+CMD ["--spring.profiles.active=docker"]
+

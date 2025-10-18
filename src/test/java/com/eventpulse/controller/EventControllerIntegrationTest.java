@@ -1,34 +1,28 @@
 package com.eventpulse.controller;
 
 import com.eventpulse.dto.EventRequest;
-import com.eventpulse.dto.EventResponse;
 import com.eventpulse.entity.Event;
+import com.eventpulse.repository.EventRepository;
 import com.eventpulse.security.JwtUtils;
-import com.eventpulse.service.EventService;
-import com.eventpulse.service.WebSocketService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(EventController.class)
-@DisplayName("EventController Integration Tests")
+@SpringBootTest
+@AutoConfigureMockMvc
 class EventControllerIntegrationTest {
 
     @Autowired
@@ -37,333 +31,211 @@ class EventControllerIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
-    private EventService eventService;
+    @Autowired
+    private EventRepository eventRepository;
 
-    @MockBean
-    private WebSocketService webSocketService;
-
-    @MockBean
+    @Autowired
     private JwtUtils jwtUtils;
 
-    private Event testEvent;
-    private EventRequest testEventRequest;
-    private String validJwtToken;
+    private String jwtToken;
 
     @BeforeEach
     void setUp() {
-        UUID eventId = UUID.randomUUID();
-        testEvent = Event.builder()
-                .id(eventId)
-                .source("test-service")
-                .type("test")
-                .message("Test message")
-                .timestamp(Instant.now())
-                .build();
+        eventRepository.deleteAll();
+        jwtToken = jwtUtils.generateToken("testuser");
+    }
 
-        testEventRequest = EventRequest.builder()
-                .source("test-service")
-                .type("test")
-                .message("Test message")
-                .build();
-
-        validJwtToken = "valid.jwt.token";
+    @AfterEach
+    void tearDown() {
+        eventRepository.deleteAll();
     }
 
     @Test
-    @DisplayName("Should create event successfully")
-    void shouldCreateEventSuccessfully() throws Exception {
-        // Given
-        when(eventService.saveEvent(any(Event.class))).thenReturn(testEvent);
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
+    void createEvent_ValidRequest_ShouldPersistToDatabase() throws Exception {
+        // Arrange
+        EventRequest request = new EventRequest();
+        request.setSource("integration-test");
+        request.setType("TEST");
+        request.setMessage("Integration test message");
+        request.setTimestamp(Instant.now());
 
-        // When & Then
+        // Act
         mockMvc.perform(post("/api/events")
-                        .header("Authorization", "Bearer " + validJwtToken)
+                        .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testEventRequest)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.id").value(testEvent.getId().toString()))
-                .andExpect(jsonPath("$.source").value("test-service"))
-                .andExpect(jsonPath("$.type").value("test"))
-                .andExpect(jsonPath("$.message").value("Test message"))
-                .andExpect(jsonPath("$.timestamp").exists());
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.source").value("integration-test"))
+                .andExpect(jsonPath("$.type").value("TEST"))
+                .andExpect(jsonPath("$.message").value("Integration test message"));
 
-        verify(eventService, times(1)).saveEvent(any(Event.class));
-        verify(webSocketService, times(1)).broadcastNewEvent(any(Event.class));
+        // Assert
+        assertThat(eventRepository.count()).isEqualTo(1);
+        Event savedEvent = eventRepository.findAll().get(0);
+        assertThat(savedEvent.getSource()).isEqualTo("integration-test");
+        assertThat(savedEvent.getType()).isEqualTo("TEST");
     }
 
     @Test
-    @DisplayName("Should return 401 when no authorization header provided")
-    void shouldReturn401WhenNoAuthorizationHeaderProvided() throws Exception {
-        // When & Then
+    void createEvent_WithoutToken_ShouldReturn401() throws Exception {
+        // Arrange
+        EventRequest request = new EventRequest();
+        request.setSource("test");
+        request.setType("TEST");
+        request.setMessage("Test");
+        request.setTimestamp(Instant.now());
+
+        // Act & Assert
         mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testEventRequest)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());
 
-        verify(eventService, never()).saveEvent(any());
-        verify(webSocketService, never()).broadcastNewEvent(any());
+        assertThat(eventRepository.count()).isEqualTo(0);
     }
 
     @Test
-    @DisplayName("Should return 401 when invalid JWT token provided")
-    void shouldReturn401WhenInvalidJwtTokenProvided() throws Exception {
-        // Given
-        String invalidToken = "invalid.jwt.token";
-        when(jwtUtils.validateJwtToken(invalidToken)).thenReturn(false);
+    void getEvents_AfterCreatingMultiple_ShouldReturnAll() throws Exception {
+        // Arrange - Create 3 events
+        createTestEvent("service1", "INFO");
+        createTestEvent("service2", "ERROR");
+        createTestEvent("service1", "WARN");
 
-        // When & Then
-        mockMvc.perform(post("/api/events")
-                        .header("Authorization", "Bearer " + invalidToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testEventRequest)))
-                .andExpect(status().isUnauthorized());
-
-        verify(eventService, never()).saveEvent(any());
-        verify(webSocketService, never()).broadcastNewEvent(any());
-    }
-
-    @Test
-    @DisplayName("Should return 400 when validation fails")
-    void shouldReturn400WhenValidationFails() throws Exception {
-        // Given
-        EventRequest invalidRequest = EventRequest.builder()
-                .source("") // Invalid: empty source
-                .type("test")
-                .message("Test message")
-                .build();
-
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
-
-        // When & Then
-        mockMvc.perform(post("/api/events")
-                        .header("Authorization", "Bearer " + validJwtToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Validation Failed"))
-                .andExpect(jsonPath("$.details.source").exists());
-
-        verify(eventService, never()).saveEvent(any());
-        verify(webSocketService, never()).broadcastNewEvent(any());
-    }
-
-    @Test
-    @DisplayName("Should get events with filters successfully")
-    void shouldGetEventsWithFiltersSuccessfully() throws Exception {
-        // Given
-        List<Event> events = Arrays.asList(testEvent);
-        when(eventService.getEventsWithFilters("test", "test-service", null, null)).thenReturn(events);
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
-
-        // When & Then
+        // Act & Assert
         mockMvc.perform(get("/api/events")
-                        .header("Authorization", "Bearer " + validJwtToken)
-                        .param("type", "test")
-                        .param("source", "test-service"))
+                        .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$[0].id").value(testEvent.getId().toString()))
-                .andExpect(jsonPath("$[0].source").value("test-service"))
-                .andExpect(jsonPath("$[0].type").value("test"));
-
-        verify(eventService, times(1)).getEventsWithFilters("test", "test-service", null, null);
+                .andExpect(jsonPath("$", hasSize(3)));
     }
 
     @Test
-    @DisplayName("Should get events with time range filters successfully")
-    void shouldGetEventsWithTimeRangeFiltersSuccessfully() throws Exception {
-        // Given
-        List<Event> events = Arrays.asList(testEvent);
-        Instant startTime = Instant.now().minusSeconds(3600);
-        Instant endTime = Instant.now();
-        
-        when(eventService.getEventsWithFilters(null, null, startTime, endTime)).thenReturn(events);
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
+    void getEvents_FilterByType_ShouldReturnMatchingEvents() throws Exception {
+        // Arrange
+        createTestEvent("service1", "INFO");
+        createTestEvent("service2", "ERROR");
+        createTestEvent("service3", "INFO");
 
-        // When & Then
+        // Act & Assert
         mockMvc.perform(get("/api/events")
-                        .header("Authorization", "Bearer " + validJwtToken)
-                        .param("startTime", startTime.toString())
-                        .param("endTime", endTime.toString()))
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .param("type", "INFO"))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$[0].id").value(testEvent.getId().toString()));
-
-        verify(eventService, times(1)).getEventsWithFilters(null, null, startTime, endTime);
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].type").value("INFO"))
+                .andExpect(jsonPath("$[1].type").value("INFO"));
     }
 
     @Test
-    @DisplayName("Should return 400 when invalid time range provided")
-    void shouldReturn400WhenInvalidTimeRangeProvided() throws Exception {
-        // Given
-        Instant startTime = Instant.now();
-        Instant endTime = Instant.now().minusSeconds(3600); // End before start
+    void getEvents_FilterBySource_ShouldReturnMatchingEvents() throws Exception {
+        // Arrange
+        createTestEvent("service1", "INFO");
+        createTestEvent("service2", "ERROR");
+        createTestEvent("service1", "WARN");
 
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
-
-        // When & Then
+        // Act & Assert
         mockMvc.perform(get("/api/events")
-                        .header("Authorization", "Bearer " + validJwtToken)
-                        .param("startTime", startTime.toString())
-                        .param("endTime", endTime.toString()))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(400));
-
-        verify(eventService, never()).getEventsWithFilters(any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("Should get event by ID successfully")
-    void shouldGetEventByIdSuccessfully() throws Exception {
-        // Given
-        when(eventService.getEventById(testEvent.getId())).thenReturn(testEvent);
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
-
-        // When & Then
-        mockMvc.perform(get("/api/events/{id}", testEvent.getId())
-                        .header("Authorization", "Bearer " + validJwtToken))
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .param("source", "service1"))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.id").value(testEvent.getId().toString()))
-                .andExpect(jsonPath("$.source").value("test-service"))
-                .andExpect(jsonPath("$.type").value("test"))
-                .andExpect(jsonPath("$.message").value("Test message"));
-
-        verify(eventService, times(1)).getEventById(testEvent.getId());
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].source").value("service1"))
+                .andExpect(jsonPath("$[1].source").value("service1"));
     }
 
     @Test
-    @DisplayName("Should return 404 when event not found")
-    void shouldReturn404WhenEventNotFound() throws Exception {
-        // Given
-        UUID nonExistentId = UUID.randomUUID();
-        when(eventService.getEventById(nonExistentId))
-                .thenThrow(new EventService.EventNotFoundException("Event not found with ID: " + nonExistentId));
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
+    void getEvents_FilterByTimeRange_ShouldReturnMatchingEvents() throws Exception {
+        // Arrange
+        Instant now = Instant.now();
+        Instant past = now.minusSeconds(3600);
+        Instant future = now.plusSeconds(3600);
 
-        // When & Then
-        mockMvc.perform(get("/api/events/{id}", nonExistentId)
-                        .header("Authorization", "Bearer " + validJwtToken))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.error").value("Not Found"));
+        Event oldEvent = createTestEventWithTimestamp("service1", "INFO", past);
+        Event newEvent = createTestEventWithTimestamp("service2", "ERROR", now);
 
-        verify(eventService, times(1)).getEventById(nonExistentId);
+        // Act & Assert - Query for recent events only
+        mockMvc.perform(get("/api/events")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .param("from", now.minusSeconds(60).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(newEvent.getId().toString()));
     }
 
     @Test
-    @DisplayName("Should return 400 when invalid UUID format provided")
-    void shouldReturn400WhenInvalidUuidFormatProvided() throws Exception {
-        // Given
-        String invalidUuid = "invalid-uuid";
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
+    void getEvents_CombinedFilters_ShouldReturnMatchingEvents() throws Exception {
+        // Arrange
+        createTestEvent("service1", "INFO");
+        createTestEvent("service1", "ERROR");
+        createTestEvent("service2", "INFO");
 
-        // When & Then
-        mockMvc.perform(get("/api/events/{id}", invalidUuid)
-                        .header("Authorization", "Bearer " + validJwtToken))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Bad Request"));
-
-        verify(eventService, never()).getEventById(any());
+        // Act & Assert
+        mockMvc.perform(get("/api/events")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .param("type", "INFO")
+                        .param("source", "service1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].type").value("INFO"))
+                .andExpect(jsonPath("$[0].source").value("service1"));
     }
 
     @Test
-    @DisplayName("Should delete event successfully")
-    void shouldDeleteEventSuccessfully() throws Exception {
-        // Given
-        doNothing().when(eventService).deleteEvent(testEvent.getId());
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
-
-        // When & Then
-        mockMvc.perform(delete("/api/events/{id}", testEvent.getId())
-                        .header("Authorization", "Bearer " + validJwtToken))
-                .andExpect(status().isNoContent());
-
-        verify(eventService, times(1)).deleteEvent(testEvent.getId());
-        verify(webSocketService, times(1)).broadcastEventDeleted(testEvent.getId());
+    void healthEndpoint_ShouldBePublic() throws Exception {
+        // Act & Assert
+        mockMvc.perform(get("/api/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OK"));
     }
 
     @Test
-    @DisplayName("Should return 404 when deleting non-existent event")
-    void shouldReturn404WhenDeletingNonExistentEvent() throws Exception {
-        // Given
-        UUID nonExistentId = UUID.randomUUID();
-        doThrow(new EventService.EventNotFoundException("Event not found with ID: " + nonExistentId))
-                .when(eventService).deleteEvent(nonExistentId);
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
+    void createAndRetrieveEvent_EndToEnd_ShouldWork() throws Exception {
+        // Arrange
+        EventRequest request = new EventRequest();
+        request.setSource("e2e-test");
+        request.setType("E2E");
+        request.setMessage("End to end test");
+        request.setTimestamp(Instant.now());
 
-        // When & Then
-        mockMvc.perform(delete("/api/events/{id}", nonExistentId)
-                        .header("Authorization", "Bearer " + validJwtToken))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.error").value("Not Found"));
-
-        verify(eventService, times(1)).deleteEvent(nonExistentId);
-        verify(webSocketService, never()).broadcastEventDeleted(any());
-    }
-
-    @Test
-    @DisplayName("Should return 500 when service throws unexpected exception")
-    void shouldReturn500WhenServiceThrowsUnexpectedException() throws Exception {
-        // Given
-        when(eventService.saveEvent(any(Event.class)))
-                .thenThrow(new RuntimeException("Unexpected database error"));
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
-
-        // When & Then
-        mockMvc.perform(post("/api/events")
-                        .header("Authorization", "Bearer " + validJwtToken)
+        // Act - Create
+        String response = mockMvc.perform(post("/api/events")
+                        .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testEventRequest)))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.error").value("Internal Server Error"));
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
 
-        verify(eventService, times(1)).saveEvent(any(Event.class));
-        verify(webSocketService, never()).broadcastNewEvent(any());
+        // Act - Retrieve
+        mockMvc.perform(get("/api/events")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].source").value("e2e-test"))
+                .andExpect(jsonPath("$[0].type").value("E2E"));
+
+        // Assert - Database state
+        assertThat(eventRepository.count()).isEqualTo(1);
     }
 
-    @Test
-    @DisplayName("Should handle malformed JSON gracefully")
-    void shouldHandleMalformedJsonGracefully() throws Exception {
-        // Given
-        String malformedJson = "{ \"source\": \"test\", \"type\": }"; // Missing value
-        when(jwtUtils.validateJwtToken(validJwtToken)).thenReturn(true);
-        when(jwtUtils.getUserNameFromJwtToken(validJwtToken)).thenReturn("testuser");
+    // Helper methods
+    private Event createTestEvent(String source, String type) {
+        Event event = new Event();
+        event.setSource(source);
+        event.setType(type);
+        event.setMessage("Test message");
+        event.setTimestamp(Instant.now());
+        return eventRepository.save(event);
+    }
 
-        // When & Then
-        mockMvc.perform(post("/api/events")
-                        .header("Authorization", "Bearer " + validJwtToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(malformedJson))
-                .andExpect(status().isBadRequest());
-
-        verify(eventService, never()).saveEvent(any());
-        verify(webSocketService, never()).broadcastNewEvent(any());
+    private Event createTestEventWithTimestamp(String source, String type, Instant timestamp) {
+        Event event = new Event();
+        event.setSource(source);
+        event.setType(type);
+        event.setMessage("Test message");
+        event.setTimestamp(timestamp);
+        return eventRepository.save(event);
     }
 }
+
