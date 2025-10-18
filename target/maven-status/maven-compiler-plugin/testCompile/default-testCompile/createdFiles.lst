@@ -1,5 +1,0 @@
-com\eventpulse\controller\EventControllerIntegrationTest.class
-com\eventpulse\controller\TestSecurityConfig.class
-com\eventpulse\service\MetricsServiceTest.class
-com\eventpulse\controller\EventControllerTest.class
-com\eventpulse\service\EventServiceTest.class
